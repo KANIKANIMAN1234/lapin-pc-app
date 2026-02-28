@@ -24,10 +24,11 @@ export default function Header() {
   const [breakEndTime, setBreakEndTime] = useState('');
   const [clockOutTime, setClockOutTime] = useState('');
   const [punching, setPunching] = useState(false);
+  const [attLoading, setAttLoading] = useState(true);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-    if (!isApiConfigured()) return;
+    if (!isApiConfigured()) { setAttLoading(false); return; }
     api.getAttendanceStatus().then((res) => {
       if (res.success && res.data) {
         const d = res.data;
@@ -37,7 +38,7 @@ export default function Header() {
         if (d.break_end) setBreakEndTime(d.break_end);
         if (d.clock_out) setClockOutTime(d.clock_out);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setAttLoading(false));
   }, []);
 
   const handleLogout = () => { logout(); router.replace('/'); };
@@ -97,16 +98,16 @@ export default function Header() {
 
       <div className="header-bar-right">
         <div className="header-attendance-group">
-          <button onClick={() => punch('clock_in', 'working')} disabled={punching || attStatus !== 'none'} className="att-btn att-clockin">
+          <button onClick={() => punch('clock_in', 'working')} disabled={attLoading || punching || attStatus !== 'none'} className="att-btn att-clockin">
             <span className="material-icons">login</span>出勤
           </button>
-          <button onClick={() => punch('break_start', 'break')} disabled={punching || attStatus !== 'working'} className="att-btn">
+          <button onClick={() => punch('break_start', 'break')} disabled={attLoading || punching || attStatus !== 'working'} className="att-btn">
             <span className="material-icons">free_breakfast</span>休憩
           </button>
-          <button onClick={() => punch('break_end', 'working')} disabled={punching || attStatus !== 'break'} className="att-btn">
+          <button onClick={() => punch('break_end', 'working')} disabled={attLoading || punching || attStatus !== 'break'} className="att-btn">
             <span className="material-icons">replay</span>戻り
           </button>
-          <button onClick={() => punch('clock_out', 'left')} disabled={punching || attStatus === 'none' || attStatus === 'left'} className="att-btn att-clockout">
+          <button onClick={() => punch('clock_out', 'left')} disabled={attLoading || punching || attStatus === 'none' || attStatus === 'left'} className="att-btn att-clockout">
             <span className="material-icons">logout</span>退勤
           </button>
 

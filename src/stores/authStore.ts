@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { AppNotification, User } from '@/types';
 
 interface AuthState {
@@ -40,45 +41,56 @@ const DEMO_USERS: Record<string, User> = {
   },
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: false,
-  notifications: [],
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      notifications: [],
 
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
 
-  login: (user, token) => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('auth_token', token);
+      login: (user, token) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', token);
+        }
+        set({ user, isAuthenticated: true });
+      },
+
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
+        set({ user: null, isAuthenticated: false, notifications: [] });
+      },
+
+      setLoading: (isLoading) => set({ isLoading }),
+
+      loginAsDemo: (role) => {
+        const user = DEMO_USERS[role];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', 'demo_token_' + role);
+        }
+        set({ user, isAuthenticated: true });
+      },
+
+      addNotification: (notification) =>
+        set((state) => ({ notifications: [notification, ...state.notifications] })),
+
+      markNotificationRead: (id) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          ),
+        })),
+    }),
+    {
+      name: 'lapin-auth',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
-    set({ user, isAuthenticated: true });
-  },
-
-  logout: () => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('auth_token');
-    }
-    set({ user: null, isAuthenticated: false, notifications: [] });
-  },
-
-  setLoading: (isLoading) => set({ isLoading }),
-
-  loginAsDemo: (role) => {
-    const user = DEMO_USERS[role];
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('auth_token', 'demo_token_' + role);
-    }
-    set({ user, isAuthenticated: true });
-  },
-
-  addNotification: (notification) =>
-    set((state) => ({ notifications: [notification, ...state.notifications] })),
-
-  markNotificationRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
-    })),
-}));
+  )
+);

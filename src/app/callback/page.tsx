@@ -28,7 +28,7 @@ function CallbackHandler() {
       return;
     }
 
-    const savedState = typeof window !== 'undefined' ? sessionStorage.getItem('line_login_state') : null;
+    const savedState = typeof window !== 'undefined' ? localStorage.getItem('line_login_state') : null;
     if (savedState && state !== savedState) {
       setError('認証状態が一致しません。再度ログインしてください。');
       return;

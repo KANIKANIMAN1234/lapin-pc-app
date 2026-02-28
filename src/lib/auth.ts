@@ -6,7 +6,7 @@ const LINE_LOGIN_CALLBACK_URL =
 export function getLineLoginUrl(): string {
   const state = generateRandomState();
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem('line_login_state', state);
+    localStorage.setItem('line_login_state', state);
   }
   const params = new URLSearchParams({
     response_type: 'code',
@@ -49,7 +49,7 @@ export async function exchangeCodeForToken(code: string): Promise<{ token: strin
 
 export function clearAuth(): void {
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('line_login_state');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('line_login_state');
   }
 }

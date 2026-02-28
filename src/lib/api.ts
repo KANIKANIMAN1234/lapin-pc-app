@@ -10,7 +10,7 @@ import type {
 const GAS_URL = process.env.NEXT_PUBLIC_GAS_WEB_APP_URL || '';
 
 function getToken(): string | null {
-  return typeof window !== 'undefined' ? sessionStorage.getItem('auth_token') : null;
+  return typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 }
 
 export function isApiConfigured(): boolean {
