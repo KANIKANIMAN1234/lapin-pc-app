@@ -136,6 +136,9 @@ export const api = {
   getAttendanceStatus: () =>
     requestGet<{ status: string; clock_in: string; break_start: string; break_end: string; clock_out: string; total_work_minutes?: number }>('getAttendanceStatus'),
 
+  createSession: (idToken: string) =>
+    requestPost<{ session_token: string; user: { id: string; name: string; email: string; role: string } }>('createSession', { id_token: idToken }),
+
   getCompanySettings: () =>
     requestGet<Record<string, string>>('getCompanySettings'),
 

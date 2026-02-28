@@ -4,8 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { exchangeCodeForToken } from '@/lib/auth';
-
-const GAS_URL = process.env.NEXT_PUBLIC_GAS_WEB_APP_URL || '';
+import { api } from '@/lib/api';
 
 function CallbackHandler() {
   const router = useRouter();
@@ -43,24 +42,23 @@ function CallbackHandler() {
         }
         const idToken = result.token;
 
-        const url = `${GAS_URL}?action=getUserInfo&token=${encodeURIComponent(idToken)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.success && data.data) {
+        // LINE IDトークンからセッショントークンを発行
+        const sessionRes = await api.createSession(idToken);
+        if (sessionRes.success && sessionRes.data) {
+          const { session_token, user: userData } = sessionRes.data;
           login(
             {
-              id: String(data.data.id),
-              name: data.data.name,
-              role: data.data.role,
-              email: data.data.email || '',
+              id: String(userData.id),
+              name: userData.name,
+              role: userData.role,
+              email: userData.email || '',
               status: 'active',
             },
-            idToken
+            session_token
           );
           router.replace('/dashboard');
         } else {
-          setError('ユーザー情報の取得に失敗しました: ' + (data.error?.message || data.error || '不明なエラー'));
+          setError('セッション作成に失敗しました: ' + (sessionRes.error || '不明なエラー'));
         }
       } catch (err) {
         setError('ログイン処理中にエラーが発生しました: ' + String(err));
