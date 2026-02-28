@@ -21,19 +21,31 @@ async function requestGet<T>(
   action: string,
   params: Record<string, string> = {},
 ): Promise<ApiResponse<T>> {
-  if (!GAS_URL) return { success: false, error: 'GAS_URL未設定' };
+  if (!GAS_URL) {
+    console.warn('[API] GAS_URL未設定');
+    return { success: false, error: 'GAS_URL未設定' };
+  }
   const token = getToken();
   const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
   if (token) url.searchParams.set('token', token);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
+  console.log(`[API GET] ${action} → ${url.toString().substring(0, 120)}...`);
+
   try {
     const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const text = await res.text();
+    console.log(`[API GET] ${action} status=${res.status} body=${text.substring(0, 300)}`);
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch {
+      console.error(`[API GET] ${action} JSONパースエラー: ${text.substring(0, 200)}`);
+      return { success: false, error: 'レスポンスがJSONではありません' };
+    }
   } catch (error) {
-    console.error(`API GET [${action}]:`, error);
+    console.error(`[API GET] ${action} ネットワークエラー:`, error);
     return { success: false, error: String(error) };
   }
 }
@@ -44,16 +56,24 @@ async function requestPost<T>(
 ): Promise<ApiResponse<T>> {
   if (!GAS_URL) return { success: false, error: 'GAS_URL未設定' };
   const token = getToken();
+  console.log(`[API POST] ${action}`);
   try {
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action, token: token || '', data }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const text = await res.text();
+    console.log(`[API POST] ${action} status=${res.status} body=${text.substring(0, 300)}`);
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch {
+      console.error(`[API POST] ${action} JSONパースエラー: ${text.substring(0, 200)}`);
+      return { success: false, error: 'レスポンスがJSONではありません' };
+    }
   } catch (error) {
-    console.error(`API POST [${action}]:`, error);
+    console.error(`[API POST] ${action} ネットワークエラー:`, error);
     return { success: false, error: String(error) };
   }
 }
