@@ -42,9 +42,30 @@ export default function Header() {
 
   const handleLogout = () => { logout(); router.replace('/'); };
 
+  const getLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
+    if (!navigator.geolocation) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    });
+  };
+
   const punch = useCallback(async (type: string, nextStatus: AttStatus) => {
     setPunching(true);
-    const res = await api.createAttendance({ type });
+    const payload: Record<string, unknown> = { type };
+
+    if (type === 'clock_in' || type === 'clock_out') {
+      const loc = await getLocation();
+      if (loc) {
+        payload.latitude = loc.latitude;
+        payload.longitude = loc.longitude;
+      }
+    }
+
+    const res = await api.createAttendance(payload);
     if (res.success && res.data) {
       const time = (res.data as { time?: string }).time || '';
       setAttStatus(nextStatus);
