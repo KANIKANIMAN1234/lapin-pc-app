@@ -97,28 +97,29 @@ body {
 
 /* My Bonus Section */
 .my-bonus-section {
-  background: white; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;
+  background: white; border-radius: 10px; padding: 0.6rem 1rem; margin-bottom: 1rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #f59e0b;
 }
-.my-bonus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.my-bonus-header h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
-.my-bonus-period { font-size: 0.8rem; background: #f3f4f6; padding: 0.25rem 0.75rem; border-radius: 9999px; }
-.my-bonus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
-.my-bonus-card { background: #f9fafb; border-radius: 8px; padding: 1rem; text-align: center; }
+.my-bonus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+.my-bonus-header h3 { font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; }
+.my-bonus-header h3 .material-icons { font-size: 18px; }
+.my-bonus-period { font-size: 0.7rem; background: #f3f4f6; padding: 0.15rem 0.6rem; border-radius: 9999px; }
+.my-bonus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 0.4rem; }
+.my-bonus-card { background: #f9fafb; border-radius: 6px; padding: 0.4rem 0.6rem; text-align: center; }
 .my-bonus-card.highlight-positive { background: #ecfdf5; border: 1px solid #a7f3d0; }
 .my-bonus-card.highlight-negative { background: #fef2f2; border: 1px solid #fecaca; }
 .my-bonus-card.highlight-accent { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #fbbf24; }
-.my-bonus-label { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; }
-.my-bonus-value { font-size: 1.5rem; font-weight: 700; color: #1f2937; }
-.my-bonus-unit { font-size: 0.75rem; font-weight: 400; }
-.my-bonus-sub { font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem; }
-.my-bonus-progress-wrap { margin-top: 0.5rem; }
-.my-bonus-progress-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #9ca3af; margin-bottom: 4px; }
+.my-bonus-label { font-size: 0.65rem; color: #6b7280; margin-bottom: 0.1rem; }
+.my-bonus-value { font-size: 1rem; font-weight: 700; color: #1f2937; }
+.my-bonus-unit { font-size: 0.65rem; font-weight: 400; }
+.my-bonus-sub { font-size: 0.6rem; color: #9ca3af; margin-top: 0.1rem; }
+.my-bonus-progress-wrap { margin-top: 0.2rem; }
+.my-bonus-progress-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #9ca3af; margin-bottom: 2px; }
 .my-bonus-breakeven-label { color: #ef4444; font-weight: 500; }
-.my-bonus-progress-bar { position: relative; height: 14px; background: #e5e7eb; border-radius: 9999px; overflow: visible; }
+.my-bonus-progress-bar { position: relative; height: 8px; background: #e5e7eb; border-radius: 9999px; overflow: visible; }
 .my-bonus-progress-fill { height: 100%; background: linear-gradient(90deg, #06C755, #34d399); border-radius: 9999px; transition: width 0.5s; }
-.my-bonus-breakeven-line { position: absolute; top: -3px; width: 2px; height: 20px; background: #ef4444; }
-.my-bonus-progress-current { text-align: right; font-size: 0.75rem; color: #6b7280; margin-top: 4px; }
+.my-bonus-breakeven-line { position: absolute; top: -2px; width: 2px; height: 12px; background: #ef4444; }
+.my-bonus-progress-current { text-align: right; font-size: 0.65rem; color: #6b7280; margin-top: 2px; }
 
 /* Charts Grid */
 .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
