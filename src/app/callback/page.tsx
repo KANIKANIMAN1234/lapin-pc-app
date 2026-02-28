@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { exchangeCodeForToken } from '@/lib/auth';
 import { api } from '@/lib/api';
+import type { UserRole } from '@/types';
 
 function CallbackHandler() {
   const router = useRouter();
@@ -50,7 +51,7 @@ function CallbackHandler() {
             {
               id: String(userData.id),
               name: userData.name,
-              role: userData.role,
+              role: userData.role as UserRole,
               email: userData.email || '',
               status: 'active',
             },
