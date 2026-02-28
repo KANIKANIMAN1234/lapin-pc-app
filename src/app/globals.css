@@ -79,18 +79,19 @@ body {
 }
 
 /* KPI Card styles */
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
-@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.kpi-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.625rem; margin-bottom: 1.5rem; }
+@media (max-width: 1400px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpi-card {
-  background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  background: white; border-radius: 10px; padding: 0.75rem 0.875rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s; min-width: 0;
 }
 .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.kpi-title { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; }
-.kpi-value { font-size: 1.75rem; font-weight: 700; color: #1f2937; }
-.kpi-unit { font-size: 0.875rem; font-weight: 400; margin-left: 0.25rem; color: #6b7280; }
-.kpi-change { font-size: 0.75rem; margin-top: 0.25rem; }
+.kpi-title { font-size: 0.7rem; color: #6b7280; margin-bottom: 0.15rem; white-space: nowrap; }
+.kpi-value { font-size: 1.35rem; font-weight: 700; color: #1f2937; white-space: nowrap; }
+.kpi-unit { font-size: 0.75rem; font-weight: 400; margin-left: 0.15rem; color: #6b7280; }
+.kpi-change { font-size: 0.7rem; margin-top: 0.15rem; }
 .kpi-change.positive { color: #059669; }
 .kpi-change.negative { color: #dc2626; }
 
@@ -528,7 +529,6 @@ td.emp-actions { display: flex; gap: 0.5rem; align-items: center; white-space: n
 }
 
 @media (max-width: 768px) {
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .my-bonus-grid { grid-template-columns: 1fr 1fr; }
   .sidebar-nav { width: 180px; }
   .header-brand-sub { display: none; }
