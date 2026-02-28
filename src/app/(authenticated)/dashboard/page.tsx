@@ -256,13 +256,8 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h2 className="text-xl font-bold">営業ダッシュボード: {data.user_name ?? user?.name ?? 'ユーザー'}</h2>
-        <select value={period} onChange={(e) => setPeriod(e.target.value)} className="form-input w-auto">
-          <option>今月</option>
-          <option>今四半期</option>
-          <option>今年</option>
-        </select>
       </div>
 
       <div className="kpi-grid">
