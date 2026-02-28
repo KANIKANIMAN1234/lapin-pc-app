@@ -86,16 +86,16 @@ export const api = {
     requestGet<{ projects: Project[]; total: number }>('getProjects', params ?? { limit: '500' }),
 
   getProject: (id: string) =>
-    requestGet<{ project: Project }>('getProject', { id }),
+    requestGet<{ project: Project }>('getProject', { project_id: id }),
 
   createProject: (data: Partial<Project>) =>
     requestPost<Project>('createProject', data as Record<string, unknown>),
 
   updateProject: (id: string, data: Partial<Project>) =>
-    requestPost<Project>('updateProject', { id, ...data } as Record<string, unknown>),
+    requestPost<Project>('updateProject', { project_id: id, ...data } as Record<string, unknown>),
 
   deleteProject: (id: string) =>
-    requestPost<void>('deleteProject', { id }),
+    requestPost<void>('deleteProject', { project_id: id }),
 
   getPhotos: (projectId: string) =>
     requestGet<{ photos: Photo[] }>('getPhotos', { project_id: projectId }),
@@ -144,4 +144,10 @@ export const api = {
 
   saveUserMapSettings: (data: Record<string, unknown>) =>
     requestPost<void>('saveUserMapSettings', data),
+
+  getUserInfo: () =>
+    requestGet<{ id: string; name: string; role: string; avatar_url?: string }>('getUserInfo'),
+
+  uploadProfilePhoto: (photoData: string) =>
+    requestPost<{ avatar_url: string; drive_url: string }>('uploadProfilePhoto', { photo_data: photoData }),
 };

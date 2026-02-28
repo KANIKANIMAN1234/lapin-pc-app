@@ -11,8 +11,12 @@ interface ExpenseRow {
   date: string;
   category: string;
   amount: number;
-  project: string;
-  memo: string;
+  projectNumber: string;
+  customerName: string;
+  description: string;
+  userName: string;
+  status: string;
+  notes: string;
 }
 
 export default function ExpensePage() {
@@ -46,13 +50,18 @@ export default function ExpensePage() {
         })));
       }
       if (expRes.success && expRes.data?.expenses) {
-        setExpenses(expRes.data.expenses.map((e) => ({
+        const raw = expRes.data.expenses as unknown as Record<string, unknown>[];
+        setExpenses(raw.map((e) => ({
           id: String(e.id),
-          date: String((e as unknown as Record<string, unknown>).expense_date || e.date || '').substring(0, 10),
+          date: String(e.expense_date || e.date || '').substring(0, 10),
           category: String(e.category || ''),
           amount: Number(e.amount) || 0,
-          project: String((e as unknown as Record<string, unknown>).project_number || ''),
-          memo: String(e.memo || ''),
+          projectNumber: String(e.project_number || ''),
+          customerName: String(e.customer_name || ''),
+          description: String(e.description || ''),
+          userName: String(e.user_name || ''),
+          status: String(e.status || ''),
+          notes: String(e.notes || ''),
         })));
       }
       setLoading(false);
@@ -99,8 +108,14 @@ export default function ExpensePage() {
       receipt_image: receiptBase64 || '',
     });
     if (res.success) {
-      const label = projectOptions.find((o) => o.value === project)?.label ?? '';
-      setExpenses((prev) => [{ id: String(Date.now()), date, category, amount: Number(amount), project: label, memo }, ...prev]);
+      const opt = projectOptions.find((o) => o.value === project);
+      const pNum = opt ? opt.label.split(' ')[0] : '';
+      const cName = opt ? opt.label.split(' ').slice(1).join(' ') : '';
+      setExpenses((prev) => [{
+        id: String(Date.now()), date, category, amount: Number(amount),
+        projectNumber: pNum, customerName: cName, description: memo,
+        userName: '', status: 'pending', notes: '',
+      }, ...prev]);
       setProject(''); setAmount(''); setDate(new Date().toISOString().slice(0, 10)); setCategory('その他'); setMemo('');
       setReceiptPreview(null); setReceiptBase64(null); setOcrResult(null);
       setToast({ show: true, message: 'スプレッドシートに登録しました', type: 'success' });
@@ -182,16 +197,31 @@ export default function ExpensePage() {
         <div className="expense-history-card">
           <h3 className="font-bold mb-4 flex items-center gap-2"><span className="material-icons">history</span>最近の経費登録</h3>
           <div className="space-y-2">
-            {expenses.map((item) => (
-              <div key={item.id} className="p-3 rounded-lg border-l-4 border-green-500 bg-gray-50 hover:bg-gray-100">
-                <div className="flex justify-between items-start gap-2">
-                  <div><span className="text-xs text-gray-500">{item.date}</span><span className="badge badge-green ml-2">{item.category}</span></div>
-                  <span className="font-bold text-gray-800">¥{item.amount.toLocaleString()}</span>
+            {expenses.map((item) => {
+              const statusLabel = item.status === 'approved' ? '承認済' : item.status === 'rejected' ? '却下' : '申請中';
+              const statusClass = item.status === 'approved' ? 'badge-green' : item.status === 'rejected' ? 'badge-red' : 'badge-yellow';
+              return (
+                <div key={item.id} className="p-3 rounded-lg border-l-4 border-green-500 bg-gray-50 hover:bg-gray-100">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500">{item.date}</span>
+                      <span className="badge badge-green">{item.category}</span>
+                      <span className={`badge ${statusClass}`} style={{ fontSize: '10px', padding: '1px 6px' }}>{statusLabel}</span>
+                    </div>
+                    <span className="font-bold text-gray-800 whitespace-nowrap">¥{item.amount.toLocaleString()}</span>
+                  </div>
+                  {item.description && <p className="text-sm text-gray-800 mt-1.5 font-medium">{item.description}</p>}
+                  {(item.projectNumber || item.customerName) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle' }}>folder</span>{' '}
+                      {item.projectNumber}{item.customerName ? ` ${item.customerName}` : ''}
+                    </p>
+                  )}
+                  {item.userName && <p className="text-xs text-gray-400 mt-0.5">登録者: {item.userName}</p>}
+                  {item.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{item.notes}</p>}
                 </div>
-                {item.project && <p className="text-sm text-gray-600 mt-1">{item.project}</p>}
-                {item.memo && <p className="text-sm text-gray-500 truncate mt-0.5">{item.memo}</p>}
-              </div>
-            ))}
+              );
+            })}
             {expenses.length === 0 && <p className="text-center text-gray-500 py-4">経費データがありません</p>}
           </div>
         </div>
