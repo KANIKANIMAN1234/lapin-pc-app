@@ -27,7 +27,7 @@ export async function exchangeCodeForToken(code: string): Promise<{ token: strin
   if (!gasUrl) return { token: null, error: 'GAS_URL未設定' };
   if (!LINE_LOGIN_CALLBACK_URL) return { token: null, error: 'CALLBACK_URL未設定' };
 
-  const url = `${gasUrl}?action=lineTokenExchange&code=${code}&redirect_uri=${encodeURIComponent(LINE_LOGIN_CALLBACK_URL)}`;
+  const url = `${gasUrl}?action=lineTokenExchange&code=${encodeURIComponent(code)}`;
   try {
     const response = await fetch(url);
     const text = await response.text();
