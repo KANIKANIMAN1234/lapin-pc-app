@@ -132,4 +132,10 @@ export const api = {
 
   createAttendance: (data: Record<string, unknown>) =>
     requestPost<unknown>('createAttendance', data),
+
+  getCompanySettings: () =>
+    requestGet<Record<string, string>>('getCompanySettings'),
+
+  saveCompanySettings: (data: Record<string, unknown>) =>
+    requestPost<void>('saveCompanySettings', data),
 };

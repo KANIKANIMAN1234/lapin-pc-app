@@ -58,9 +58,13 @@ export default function AdminPage() {
 
   const [companyName, setCompanyName] = useState('');
   const [tradeName, setTradeName] = useState('');
+  const [corpNumber, setCorporateNumber] = useState('');
   const [representative, setRepresentative] = useState('');
   const [address, setAddress] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
+  const [headerDisplay, setHeaderDisplay] = useState<'company' | 'trade'>('trade');
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companyLoaded, setCompanyLoaded] = useState(false);
 
   // Modals
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -128,6 +132,26 @@ export default function AdminPage() {
       fetchEmployees();
     }
   }, [activeTab, employees.length, empError, fetchEmployees]);
+
+  useEffect(() => {
+    if (activeTab === 'company' && !companyLoaded && isApiConfigured()) {
+      setCompanyLoading(true);
+      api.getCompanySettings().then((res) => {
+        if (res.success && res.data) {
+          const d = res.data as Record<string, string>;
+          setCompanyName(d.company_name || '');
+          setTradeName(d.trade_name || '');
+          setCorporateNumber(d.corp_number || '');
+          setRepresentative(d.representative || '');
+          setAddress(d.address || '');
+          setCompanyPhone(d.phone || '');
+          setHeaderDisplay((d.header_display as 'company' | 'trade') || 'trade');
+        }
+        setCompanyLoaded(true);
+        setCompanyLoading(false);
+      });
+    }
+  }, [activeTab, companyLoaded]);
 
   if (user?.role !== 'admin') {
     return (
@@ -236,6 +260,26 @@ export default function AdminPage() {
     }
   };
 
+  const handleSaveCompany = async () => {
+    if (!companyName.trim()) {
+      showToast('会社名を入力してください', 'error');
+      return;
+    }
+    setSubmitting(true);
+    const res = await api.saveCompanySettings({
+      company_name: companyName, trade_name: tradeName, corp_number: corpNumber,
+      representative, address, phone: companyPhone, header_display: headerDisplay,
+    });
+    setSubmitting(false);
+    if (res.success) {
+      showToast('企業情報を保存しました');
+    } else {
+      showToast(String(typeof res.error === 'object' ? (res.error as Record<string, unknown>).message : res.error) || '保存に失敗しました', 'error');
+    }
+  };
+
+  const headerPreviewText = headerDisplay === 'company' ? (companyName || '未登録') : (tradeName || '未登録');
+
   const formatDate = (d: string) => {
     if (!d) return '—';
     try {
@@ -276,16 +320,81 @@ export default function AdminPage() {
       )}
 
       {activeTab === 'company' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-w-2xl">
-          <div className="p-4 border-b border-gray-100 bg-gray-50"><h3 className="font-bold">企業情報</h3></div>
-          <div className="p-6 space-y-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">会社名</label><input type="text" className="form-input" value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">屋号</label><input type="text" className="form-input" value={tradeName} onChange={(e) => setTradeName(e.target.value)} /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">代表者</label><input type="text" className="form-input" value={representative} onChange={(e) => setRepresentative(e.target.value)} /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">住所</label><input type="text" className="form-input" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label><input type="text" className="form-input" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} /></div>
-            <button type="button" className="btn-primary" onClick={() => showToast('企業情報を保存しました')}>保存</button>
+        <div className="company-reg-card">
+          <div className="company-reg-header">
+            <span className="material-icons text-green-600 text-2xl">domain</span>
+            <h3 className="text-lg font-bold">企業情報</h3>
           </div>
+          {companyLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
+          ) : (
+            <div className="company-reg-form">
+              <div className="company-form-grid">
+                <div className="form-group">
+                  <label>会社名 <span className="required">*</span></label>
+                  <input type="text" className="form-input" placeholder="例: 合同会社 中山塗装" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>屋号</label>
+                  <input type="text" className="form-input" placeholder="例: ラパンリフォーム" value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>法人番号</label>
+                  <input type="text" className="form-input" placeholder="例: 1234567890123" maxLength={13} value={corpNumber} onChange={(e) => setCorporateNumber(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>代表者</label>
+                  <input type="text" className="form-input" placeholder="例: 中山隆志" value={representative} onChange={(e) => setRepresentative(e.target.value)} />
+                </div>
+                <div className="form-group company-form-full">
+                  <label>住所</label>
+                  <input type="text" className="form-input" placeholder="例: 埼玉県狭山市南入曽580-1 ビジネススクエア入曽A" value={address} onChange={(e) => setAddress(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>電話番号</label>
+                  <input type="tel" className="form-input" placeholder="例: 04-2907-5022" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} />
+                </div>
+              </div>
+
+              <hr className="company-divider" />
+
+              <div className="company-display-setting">
+                <h4 className="flex items-center gap-2 font-bold text-sm mb-1">
+                  <span className="material-icons text-gray-500 text-xl">tv</span>ヘッダー表示名設定
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">画面左上のヘッダーに表示する名称を選択してください。</p>
+                <div className="company-display-options">
+                  <label className={`company-display-radio ${headerDisplay === 'company' ? 'selected' : ''}`}>
+                    <input type="radio" name="header-display" value="company" checked={headerDisplay === 'company'} onChange={() => setHeaderDisplay('company')} />
+                    <div className="company-display-radio-body">
+                      <strong>会社名</strong>
+                      <span>{companyName || '未登録'}</span>
+                    </div>
+                  </label>
+                  <label className={`company-display-radio ${headerDisplay === 'trade' ? 'selected' : ''}`}>
+                    <input type="radio" name="header-display" value="trade" checked={headerDisplay === 'trade'} onChange={() => setHeaderDisplay('trade')} />
+                    <div className="company-display-radio-body">
+                      <strong>屋号</strong>
+                      <span>{tradeName || '未登録'}</span>
+                    </div>
+                  </label>
+                </div>
+                <div className="company-display-preview">
+                  <span className="company-preview-label">プレビュー:</span>
+                  <div className="company-preview-header">
+                    <span className="material-icons text-green-600 text-xl">business</span>
+                    <span className="font-bold">{headerPreviewText}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="company-form-actions">
+                <button className="btn-primary" onClick={handleSaveCompany} disabled={submitting}>
+                  <span className="material-icons text-base">save</span>{submitting ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
