@@ -375,6 +375,41 @@ body {
 /* Settings grid */
 .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
 
+/* --- 連携設定タブ --- */
+.integration-url-row { display: flex; flex-direction: column; gap: 4px; }
+.integration-url-input {
+  display: flex; align-items: center; gap: 6px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 10px;
+}
+.integration-url-input .material-icons { font-size: 18px; color: #9ca3af; flex-shrink: 0; }
+.integration-url-input .form-input {
+  flex: 1; border: none; background: transparent; font-size: 0.85rem; padding: 4px 0;
+}
+.integration-url-input .form-input:focus { outline: none; box-shadow: none; }
+.integration-url-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: none; border-radius: 6px;
+  background: #e5e7eb; color: #6b7280; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+}
+.integration-url-btn:hover { background: #d1d5db; color: #374151; }
+.integration-url-btn.btn-save { background: #06C755; color: white; }
+.integration-url-btn.btn-save:hover { background: #05a347; }
+.integration-url-btn .material-icons { font-size: 16px; }
+.integration-url-hint { font-size: 0.75rem; color: #6b7280; margin-top: 2px; }
+.line-connected { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.toggle-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; cursor: pointer; margin-bottom: 4px;
+}
+.toggle-label input[type="checkbox"] { accent-color: #06C755; width: 18px; height: 18px; }
+.detail-section {
+  background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  border: 1px solid #f3f4f6; padding: 1.5rem;
+}
+.detail-section h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+.detail-item { margin-bottom: 1rem; }
+.detail-item > label { display: block; font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+
 /* Company registration card */
 .company-reg-card {
   background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
