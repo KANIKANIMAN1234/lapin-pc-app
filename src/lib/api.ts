@@ -162,4 +162,40 @@ export const api = {
 
   uploadProfilePhoto: (photoData: string) =>
     requestPost<{ avatar_url: string; drive_url: string }>('uploadProfilePhoto', { photo_data: photoData }),
+
+  getMeetings: (projectId: string) =>
+    requestGet<{ meetings: MeetingRecord[]; total: number }>('getMeetings', { project_id: projectId }),
+
+  createMeeting: (data: { project_id: string; meeting_date: string; meeting_type: string; attendees: string; content: string; next_action: string }) =>
+    requestPost<{ id: number; project_id: string }>('createMeeting', data),
+
+  getCostItems: (projectId: string) =>
+    requestGet<{ cost_items: CostItem[]; total: number; total_cost: number }>('getCostItems', { project_id: projectId }),
+
+  createCostItem: (data: { project_id: string; cost_date: string; category: string; vendor_name: string; description: string; amount: number }) =>
+    requestPost<{ id: number; project_id: string }>('createCostItem', data),
 };
+
+export interface MeetingRecord {
+  id: number;
+  project_id: string;
+  meeting_date: string;
+  meeting_type: string;
+  attendees: string;
+  content: string;
+  next_action: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface CostItem {
+  id: number;
+  project_id: string;
+  cost_date: string;
+  category: string;
+  vendor_name: string;
+  description: string;
+  amount: number;
+  created_at: string;
+}

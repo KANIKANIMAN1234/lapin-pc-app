@@ -41,6 +41,9 @@ export interface Project {
   status: ProjectStatus;
   inquiry_date: string;
   contract_date?: string;
+  start_date?: string;
+  completion_date?: string;
+  estimate_date?: string;
   planned_budget?: number;
   actual_budget?: number;
   actual_cost?: number;
@@ -52,6 +55,8 @@ export interface Project {
   lat?: number;
   lng?: number;
   drive_folder_id?: string;
+  drive_folder_url?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
   is_deleted?: boolean;
