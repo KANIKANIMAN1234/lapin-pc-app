@@ -17,6 +17,7 @@ interface ExpenseRow {
   userName: string;
   status: string;
   notes: string;
+  accountingImported: boolean;
 }
 
 export default function ExpensePage() {
@@ -36,12 +37,13 @@ export default function ExpensePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isApiConfigured()) { setLoading(false); return; }
     Promise.all([
       api.getProjects({ limit: '200' }),
-      api.getExpenses({ limit: '50' }),
+      api.getExpenses({ limit: '100' }),
     ]).then(([projRes, expRes]) => {
       if (projRes.success && projRes.data?.projects) {
         setProjectOptions(projRes.data.projects.map((p: Project) => ({
@@ -62,6 +64,7 @@ export default function ExpensePage() {
           userName: String(e.user_name || ''),
           status: String(e.status || ''),
           notes: String(e.notes || ''),
+          accountingImported: !!(e.accounting_imported),
         })));
       }
       setLoading(false);
@@ -73,7 +76,6 @@ export default function ExpensePage() {
     if (!file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     setReceiptPreview(url);
-
     const reader = new FileReader();
     reader.onload = async () => {
       const base64 = reader.result as string;
@@ -100,12 +102,8 @@ export default function ExpensePage() {
     if (!amount) return;
     setSubmitting(true);
     const res = await api.createExpense({
-      expense_date: date,
-      amount: Number(amount),
-      category,
-      description: memo,
-      project_id: project || '',
-      receipt_image: receiptBase64 || '',
+      expense_date: date, amount: Number(amount), category,
+      description: memo, project_id: project || '', receipt_image: receiptBase64 || '',
     });
     if (res.success) {
       const opt = projectOptions.find((o) => o.value === project);
@@ -114,7 +112,7 @@ export default function ExpensePage() {
       setExpenses((prev) => [{
         id: String(Date.now()), date, category, amount: Number(amount),
         projectNumber: pNum, customerName: cName, description: memo,
-        userName: '', status: 'pending', notes: '',
+        userName: '', status: 'pending', notes: '', accountingImported: false,
       }, ...prev]);
       setProject(''); setAmount(''); setDate(new Date().toISOString().slice(0, 10)); setCategory('その他'); setMemo('');
       setReceiptPreview(null); setReceiptBase64(null); setOcrResult(null);
@@ -125,6 +123,25 @@ export default function ExpensePage() {
     setSubmitting(false);
     setTimeout(() => setToast((t) => ({ ...t, show: false })), 3000);
   };
+
+  const handleToggleAccounting = async (expenseId: string, current: boolean) => {
+    setTogglingId(expenseId);
+    const newVal = !current;
+    setExpenses((prev) => prev.map((ex) => ex.id === expenseId ? { ...ex, accountingImported: newVal } : ex));
+    const res = await api.updateExpenseAccounting(expenseId, newVal);
+    if (!res.success) {
+      setExpenses((prev) => prev.map((ex) => ex.id === expenseId ? { ...ex, accountingImported: current } : ex));
+      setToast({ show: true, message: '更新に失敗しました', type: 'error' });
+      setTimeout(() => setToast((t) => ({ ...t, show: false })), 3000);
+    }
+    setTogglingId(null);
+  };
+
+  const now = new Date();
+  const thisMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyExpenses = expenses.filter((e) => e.date.startsWith(thisMonthStr));
+  const unprocessedCount = monthlyExpenses.filter((e) => !e.accountingImported).length;
+  const totalMonthly = monthlyExpenses.length;
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-[400px]"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>;
@@ -195,30 +212,96 @@ export default function ExpensePage() {
         </div>
 
         <div className="expense-history-card">
-          <h3 className="font-bold mb-4 flex items-center gap-2"><span className="material-icons">history</span>最近の経費登録</h3>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold flex items-center gap-2">
+              <span className="material-icons">receipt_long</span>経費処理管理
+            </h3>
+            <div className="flex items-center gap-3">
+              {unprocessedCount > 0 ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                  <span className="material-icons" style={{ fontSize: 14 }}>warning</span>
+                  未処理 {unprocessedCount}件
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                  <span className="material-icons" style={{ fontSize: 14 }}>check_circle</span>
+                  処理完了
+                </span>
+              )}
+              <span className="text-xs text-gray-400">今月 {totalMonthly}件</span>
+            </div>
+          </div>
+
+          <div className="mb-3 p-2.5 rounded-lg bg-blue-50 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4 text-xs">
+                <div className="text-blue-600">
+                  <span className="font-bold text-lg">{unprocessedCount}</span> / {totalMonthly}
+                  <span className="ml-1 text-blue-500">未取込</span>
+                </div>
+                <div className="flex-1 h-2 bg-blue-200 rounded-full overflow-hidden" style={{ minWidth: 80 }}>
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: totalMonthly > 0 ? `${((totalMonthly - unprocessedCount) / totalMonthly) * 100}%` : '0%' }}
+                  />
+                </div>
+              </div>
+              <span className="text-xs text-blue-500 font-medium">
+                {totalMonthly > 0 ? Math.round(((totalMonthly - unprocessedCount) / totalMonthly) * 100) : 0}% 完了
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
             {expenses.map((item) => {
-              const statusLabel = item.status === 'approved' ? '承認済' : item.status === 'rejected' ? '却下' : '申請中';
-              const statusClass = item.status === 'approved' ? 'badge-green' : item.status === 'rejected' ? 'badge-red' : 'badge-yellow';
+              const isToggling = togglingId === item.id;
               return (
-                <div key={item.id} className="p-3 rounded-lg border-l-4 border-green-500 bg-gray-50 hover:bg-gray-100">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">{item.date}</span>
-                      <span className="badge badge-green">{item.category}</span>
-                      <span className={`badge ${statusClass}`} style={{ fontSize: '10px', padding: '1px 6px' }}>{statusLabel}</span>
+                <div
+                  key={item.id}
+                  className={`p-3 rounded-lg border-l-4 ${item.accountingImported ? 'border-gray-300 bg-gray-50/60' : 'border-orange-400 bg-orange-50/40'} hover:bg-gray-100 transition-colors`}
+                >
+                  <div className="flex items-start gap-2">
+                    <label className="flex items-center mt-0.5 cursor-pointer shrink-0" title="会計ソフト取込済み">
+                      <input
+                        type="checkbox"
+                        checked={item.accountingImported}
+                        onChange={() => handleToggleAccounting(item.id, item.accountingImported)}
+                        disabled={isToggling}
+                        className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                      />
+                    </label>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs text-gray-500">{item.date}</span>
+                          <span className="badge badge-green" style={{ fontSize: 10, padding: '1px 5px' }}>{item.category}</span>
+                          {item.accountingImported && (
+                            <span className="badge badge-blue" style={{ fontSize: 9, padding: '0px 4px' }}>取込済</span>
+                          )}
+                        </div>
+                        <span className={`font-bold whitespace-nowrap ${item.accountingImported ? 'text-gray-400' : 'text-gray-800'}`}>
+                          ¥{item.amount.toLocaleString()}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className={`text-sm mt-1 font-medium ${item.accountingImported ? 'text-gray-400' : 'text-gray-800'}`}>{item.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        {item.userName && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <span className="material-icons" style={{ fontSize: 12 }}>person</span>
+                            {item.userName}
+                          </span>
+                        )}
+                        {(item.projectNumber || item.customerName) && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <span className="material-icons" style={{ fontSize: 12 }}>folder</span>
+                            {item.projectNumber}{item.customerName ? ` ${item.customerName}` : ''}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="font-bold text-gray-800 whitespace-nowrap">¥{item.amount.toLocaleString()}</span>
                   </div>
-                  {item.description && <p className="text-sm text-gray-800 mt-1.5 font-medium">{item.description}</p>}
-                  {(item.projectNumber || item.customerName) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle' }}>folder</span>{' '}
-                      {item.projectNumber}{item.customerName ? ` ${item.customerName}` : ''}
-                    </p>
-                  )}
-                  {item.userName && <p className="text-xs text-gray-400 mt-0.5">登録者: {item.userName}</p>}
-                  {item.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{item.notes}</p>}
                 </div>
               );
             })}

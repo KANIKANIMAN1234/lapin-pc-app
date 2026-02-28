@@ -151,6 +151,9 @@ export const api = {
   getBonusOverview: () =>
     requestGet<unknown>('getBonusOverview'),
 
+  updateExpenseAccounting: (expenseId: string, imported: boolean) =>
+    requestPost<{ expense_id: string; accounting_imported: boolean }>('updateExpenseAccounting', { expense_id: expenseId, accounting_imported: imported }),
+
   uploadProfilePhoto: (photoData: string) =>
     requestPost<{ avatar_url: string; drive_url: string }>('uploadProfilePhoto', { photo_data: photoData }),
 };
