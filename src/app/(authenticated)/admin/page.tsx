@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [empFilter, setEmpFilter] = useState<'all' | 'active' | 'retired'>('all');
   const [empLoading, setEmpLoading] = useState(false);
+  const [empError, setEmpError] = useState('');
 
   const [channelId, setChannelId] = useState('');
   const [channelToken, setChannelToken] = useState('');
@@ -59,9 +60,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (activeTab === 'employees' && isApiConfigured() && employees.length === 0) {
+    if (activeTab === 'employees' && isApiConfigured() && employees.length === 0 && !empError) {
       setEmpLoading(true);
+      setEmpError('');
       api.getEmployees().then((res) => {
+        console.log('[Admin] getEmployees response:', JSON.stringify(res).substring(0, 500));
         if (res.success && res.data?.employees) {
           setEmployees(res.data.employees.map((e) => ({
             id: String(e.id),
@@ -71,11 +74,20 @@ export default function AdminPage() {
             line_user_id: e.line_user_id,
             is_deleted: !!(e as unknown as Record<string, unknown>).is_deleted,
           })));
+        } else {
+          const errMsg = typeof res.error === 'object' && res.error !== null
+            ? (res.error as Record<string, unknown>).message || JSON.stringify(res.error)
+            : res.error || '従業員データの取得に失敗しました';
+          setEmpError(String(errMsg));
         }
+        setEmpLoading(false);
+      }).catch((err) => {
+        console.error('[Admin] getEmployees error:', err);
+        setEmpError(String(err));
         setEmpLoading(false);
       });
     }
-  }, [activeTab, employees.length]);
+  }, [activeTab, employees.length, empError]);
 
   if (user?.role !== 'admin') {
     return (
@@ -160,6 +172,13 @@ export default function AdminPage() {
               ))}
             </div>
           </div>
+          {empError && (
+            <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <p className="font-semibold flex items-center gap-1"><span className="material-icons text-base">error</span>エラー</p>
+              <p className="text-sm mt-1">{empError}</p>
+              <button type="button" className="mt-2 text-sm text-red-600 hover:underline" onClick={() => { setEmpError(''); setEmployees([]); }}>再試行</button>
+            </div>
+          )}
           {empLoading ? (
             <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
           ) : (
