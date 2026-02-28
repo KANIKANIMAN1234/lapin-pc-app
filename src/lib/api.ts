@@ -131,7 +131,10 @@ export const api = {
     requestPost<{ amount: number; store_name: string; date: string; category: string; items: string }>('ocrReceipt', data),
 
   createAttendance: (data: Record<string, unknown>) =>
-    requestPost<unknown>('createAttendance', data),
+    requestPost<{ date: string; type: string; time: string; status: string }>('createAttendance', data),
+
+  getAttendanceStatus: () =>
+    requestGet<{ status: string; clock_in: string; break_start: string; break_end: string; clock_out: string; total_work_minutes?: number }>('getAttendanceStatus'),
 
   getCompanySettings: () =>
     requestGet<Record<string, string>>('getCompanySettings'),

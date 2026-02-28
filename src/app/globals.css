@@ -34,7 +34,8 @@ body {
 .att-btn.att-clockin:hover:not(:disabled) { background: #06C755; color: white; }
 .att-btn.att-clockout { border-color: #9ca3af; }
 .att-btn.att-clockout:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
-.att-status-label { font-size: 0.7rem; color: #06C755; font-weight: 500; margin-left: 4px; }
+.att-status-label { font-size: 0.7rem; color: #06C755; font-weight: 600; margin-left: 4px; white-space: nowrap; }
+.att-time-detail { font-weight: 400; font-size: 0.65rem; color: #6b7280; }
 .header-icon-btn {
   position: relative; display: flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; border-radius: 50%; border: none; background: none;

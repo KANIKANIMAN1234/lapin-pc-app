@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, isApiConfigured } from '@/lib/api';
 
 const ROLE_LABELS: Record<string, string> = {
   admin: '社長',
@@ -12,40 +12,57 @@ const ROLE_LABELS: Record<string, string> = {
   office: '事務',
 };
 
+type AttStatus = 'none' | 'working' | 'break' | 'left';
+
 export default function Header() {
   const { user, logout, notifications } = useAuthStore();
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [attendance, setAttendance] = useState<'none' | 'working' | 'break'>('none');
-  const [attStatus, setAttStatus] = useState('');
+  const [attStatus, setAttStatus] = useState<AttStatus>('none');
+  const [clockInTime, setClockInTime] = useState('');
+  const [breakStartTime, setBreakStartTime] = useState('');
+  const [breakEndTime, setBreakEndTime] = useState('');
+  const [clockOutTime, setClockOutTime] = useState('');
+  const [punching, setPunching] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/');
-  };
+  useEffect(() => {
+    if (!isApiConfigured()) return;
+    api.getAttendanceStatus().then((res) => {
+      if (res.success && res.data) {
+        const d = res.data;
+        setAttStatus((d.status as AttStatus) || 'none');
+        if (d.clock_in) setClockInTime(d.clock_in);
+        if (d.break_start) setBreakStartTime(d.break_start);
+        if (d.break_end) setBreakEndTime(d.break_end);
+        if (d.clock_out) setClockOutTime(d.clock_out);
+      }
+    }).catch(() => {});
+  }, []);
 
-  const handleClockIn = async () => {
-    setAttendance('working');
-    const now = new Date();
-    setAttStatus(`出勤 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
-    try { await api.createAttendance({ type: 'clock_in' }); } catch { /* noop */ }
-  };
-  const handleBreakStart = async () => {
-    setAttendance('break');
-    setAttStatus('休憩中');
-    try { await api.createAttendance({ type: 'break_start' }); } catch { /* noop */ }
-  };
-  const handleBreakEnd = async () => {
-    setAttendance('working');
-    setAttStatus('勤務中');
-    try { await api.createAttendance({ type: 'break_end' }); } catch { /* noop */ }
-  };
-  const handleClockOut = async () => {
-    setAttendance('none');
-    setAttStatus('退勤済み');
-    try { await api.createAttendance({ type: 'clock_out' }); } catch { /* noop */ }
-  };
+  const handleLogout = () => { logout(); router.replace('/'); };
+
+  const punch = useCallback(async (type: string, nextStatus: AttStatus) => {
+    setPunching(true);
+    const res = await api.createAttendance({ type });
+    if (res.success && res.data) {
+      const time = (res.data as { time?: string }).time || '';
+      setAttStatus(nextStatus);
+      if (type === 'clock_in') setClockInTime(time);
+      if (type === 'break_start') setBreakStartTime(time);
+      if (type === 'break_end') setBreakEndTime(time);
+      if (type === 'clock_out') setClockOutTime(time);
+    }
+    setPunching(false);
+  }, []);
+
+  const statusLabel = attStatus === 'working' ? '勤務中'
+    : attStatus === 'break' ? '休憩中'
+    : attStatus === 'left' ? '退勤済み' : '';
+
+  const statusColor = attStatus === 'working' ? '#06C755'
+    : attStatus === 'break' ? '#f59e0b'
+    : attStatus === 'left' ? '#9ca3af' : '';
 
   return (
     <header className="header-bar">
@@ -59,41 +76,28 @@ export default function Header() {
 
       <div className="header-bar-right">
         <div className="header-attendance-group">
-          <button
-            onClick={handleClockIn}
-            disabled={attendance !== 'none'}
-            className="att-btn att-clockin"
-          >
+          <button onClick={() => punch('clock_in', 'working')} disabled={punching || attStatus !== 'none'} className="att-btn att-clockin">
             <span className="material-icons">login</span>出勤
           </button>
-          <button
-            onClick={handleBreakStart}
-            disabled={attendance !== 'working'}
-            className="att-btn"
-          >
+          <button onClick={() => punch('break_start', 'break')} disabled={punching || attStatus !== 'working'} className="att-btn">
             <span className="material-icons">free_breakfast</span>休憩
           </button>
-          <button
-            onClick={handleBreakEnd}
-            disabled={attendance !== 'break'}
-            className="att-btn"
-          >
+          <button onClick={() => punch('break_end', 'working')} disabled={punching || attStatus !== 'break'} className="att-btn">
             <span className="material-icons">replay</span>戻り
           </button>
-          <button
-            onClick={handleClockOut}
-            disabled={attendance === 'none'}
-            className="att-btn att-clockout"
-          >
+          <button onClick={() => punch('clock_out', 'left')} disabled={punching || attStatus === 'none' || attStatus === 'left'} className="att-btn att-clockout">
             <span className="material-icons">logout</span>退勤
           </button>
-          {attStatus && <span className="att-status-label">{attStatus}</span>}
+
+          {statusLabel && (
+            <span className="att-status-label" style={{ color: statusColor }}>
+              {statusLabel}
+              {clockInTime && <span className="att-time-detail"> {clockInTime}〜{clockOutTime || ''}</span>}
+            </span>
+          )}
         </div>
 
-        <button
-          onClick={() => setShowNotifications(!showNotifications)}
-          className="header-icon-btn"
-        >
+        <button onClick={() => setShowNotifications(!showNotifications)} className="header-icon-btn">
           <span className="material-icons">notifications</span>
           {unreadCount > 0 && <span className="header-notif-badge">{unreadCount}</span>}
         </button>
