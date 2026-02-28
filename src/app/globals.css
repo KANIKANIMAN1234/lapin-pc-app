@@ -7,6 +7,77 @@ body {
   font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ========================================
+   Header
+   ======================================== */
+.header-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 56px; padding: 0 16px; background: white;
+  border-bottom: 1px solid #e5e7eb; flex-shrink: 0; z-index: 100;
+}
+.header-bar-left { display: flex; align-items: center; gap: 10px; }
+.header-logo-icon { font-size: 32px; color: #06C755; }
+.header-brand-title { font-size: 1.1rem; font-weight: 700; line-height: 1.2; margin: 0; }
+.header-brand-sub { font-size: 0.65rem; color: #06C755; line-height: 1; }
+.header-bar-right { display: flex; align-items: center; gap: 8px; }
+.header-attendance-group { display: flex; align-items: center; gap: 4px; margin-right: 8px; }
+.att-btn {
+  display: inline-flex; align-items: center; gap: 3px; padding: 5px 10px;
+  border: 1px solid #d1d5db; border-radius: 6px; background: white;
+  font-size: 0.75rem; cursor: pointer; transition: all 0.2s; color: #374151;
+}
+.att-btn .material-icons { font-size: 16px; }
+.att-btn:hover:not(:disabled) { border-color: #06C755; color: #06C755; }
+.att-btn:active:not(:disabled) { transform: scale(0.96); }
+.att-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.att-btn.att-clockin { border-color: #06C755; color: #06C755; }
+.att-btn.att-clockin:hover:not(:disabled) { background: #06C755; color: white; }
+.att-btn.att-clockout { border-color: #9ca3af; }
+.att-btn.att-clockout:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+.att-status-label { font-size: 0.7rem; color: #06C755; font-weight: 500; margin-left: 4px; }
+.header-icon-btn {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%; border: none; background: none;
+  cursor: pointer; transition: background 0.2s; color: #6b7280;
+}
+.header-icon-btn:hover { background: #f3f4f6; }
+.header-notif-badge {
+  position: absolute; top: 0; right: 0; min-width: 18px; height: 18px;
+  background: #ef4444; color: white; font-size: 10px; font-weight: 700;
+  border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+}
+.header-user-menu { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
+.header-user-name { font-size: 0.875rem; font-weight: 500; color: #111827; }
+.header-user-role {
+  padding: 2px 8px; background: #f0fdf4; color: #059669;
+  font-size: 0.7rem; font-weight: 500; border-radius: 4px;
+}
+
+/* ========================================
+   Sidebar
+   ======================================== */
+.sidebar-nav {
+  width: 200px; background: white; border-right: 1px solid #e5e7eb;
+  flex-shrink: 0; overflow-y: auto;
+}
+.sidebar-nav-list { padding: 12px 0; }
+.sidebar-nav-item {
+  display: flex; align-items: center; gap: 10px; position: relative;
+  padding: 10px 20px; font-size: 0.85rem; color: #4b5563;
+  text-decoration: none; transition: all 0.15s; cursor: pointer;
+}
+.sidebar-nav-item .material-icons { font-size: 20px; }
+.sidebar-nav-item:hover { background: #f3f4f6; }
+.sidebar-nav-item.active {
+  background: #f0fdf4; color: #06C755; font-weight: 600;
+  border-left: 4px solid #06C755; padding-left: 16px;
+}
+.sidebar-nav-badge {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 9px; font-weight: 700; background: #ef4444; color: white;
+  padding: 2px 6px; border-radius: 4px; line-height: 1;
+}
+
 /* KPI Card styles */
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -390,4 +461,8 @@ td.emp-actions { display: flex; gap: 0.5rem; align-items: center; white-space: n
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .my-bonus-grid { grid-template-columns: 1fr 1fr; }
+  .sidebar-nav { width: 180px; }
+  .header-brand-sub { display: none; }
+  .header-user-name { display: none; }
+  .header-attendance-group { display: none; }
 }

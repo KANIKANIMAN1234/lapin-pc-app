@@ -21,8 +21,8 @@ export default function Sidebar() {
   const { user } = useAuthStore();
 
   return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
-      <nav className="flex-1 py-4">
+    <aside className="sidebar-nav">
+      <nav className="sidebar-nav-list">
         {NAV_ITEMS.map((item) => {
           if (item.adminOnly && user?.role !== 'admin') return null;
           const isActive = pathname.startsWith(item.href);
@@ -30,19 +30,11 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
-                isActive
-                  ? 'text-green-600 bg-green-50 font-semibold border-l-4 border-l-green-500'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
             >
-              <span className="material-icons text-xl">{item.icon}</span>
+              <span className="material-icons">{item.icon}</span>
               <span>{item.label}</span>
-              {item.isNew && (
-                <span className="ml-auto text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">
-                  NEW
-                </span>
-              )}
+              {item.isNew && <span className="sidebar-nav-badge">NEW</span>}
             </Link>
           );
         })}

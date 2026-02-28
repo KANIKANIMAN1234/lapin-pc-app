@@ -2,11 +2,13 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 const ROLE_LABELS: Record<string, string> = {
   admin: '社長',
   manager: '営業マネージャー',
   sales: '営業',
+  staff: 'スタッフ',
   office: '事務',
 };
 
@@ -15,94 +17,100 @@ export default function Header() {
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
   const [attendance, setAttendance] = useState<'none' | 'working' | 'break'>('none');
+  const [attStatus, setAttStatus] = useState('');
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleLogout = () => {
     logout();
     router.replace('/');
   };
-  const handleClockIn = () => setAttendance('working');
-  const handleBreakStart = () => setAttendance('break');
-  const handleBreakEnd = () => setAttendance('working');
-  const handleClockOut = () => setAttendance('none');
+
+  const handleClockIn = async () => {
+    setAttendance('working');
+    const now = new Date();
+    setAttStatus(`出勤 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+    try { await api.createAttendance({ type: 'clock_in' }); } catch { /* noop */ }
+  };
+  const handleBreakStart = async () => {
+    setAttendance('break');
+    setAttStatus('休憩中');
+    try { await api.createAttendance({ type: 'break_start' }); } catch { /* noop */ }
+  };
+  const handleBreakEnd = async () => {
+    setAttendance('working');
+    setAttStatus('勤務中');
+    try { await api.createAttendance({ type: 'break_end' }); } catch { /* noop */ }
+  };
+  const handleClockOut = async () => {
+    setAttendance('none');
+    setAttStatus('退勤済み');
+    try { await api.createAttendance({ type: 'clock_out' }); } catch { /* noop */ }
+  };
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-3">
-        <span className="material-icons text-green-500 text-3xl">business</span>
+    <header className="header-bar">
+      <div className="header-bar-left">
+        <span className="material-icons header-logo-icon">business</span>
         <div>
-          <h1 className="text-sm font-bold leading-tight">ラパンリフォーム</h1>
-          <span className="text-[10px] text-gray-400">LINE公式アカウント連携</span>
+          <h1 className="header-brand-title">ラパンリフォーム</h1>
+          <span className="header-brand-sub">LINE公式アカウント連携</span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {/* Attendance */}
-        <div className="flex items-center gap-1 mr-2">
+
+      <div className="header-bar-right">
+        <div className="header-attendance-group">
           <button
             onClick={handleClockIn}
             disabled={attendance !== 'none'}
-            className="att-btn text-xs px-2 py-1 rounded border border-gray-200 flex items-center gap-1 disabled:opacity-40"
+            className="att-btn att-clockin"
           >
-            <span className="material-icons text-sm">login</span>出勤
+            <span className="material-icons">login</span>出勤
           </button>
           <button
             onClick={handleBreakStart}
             disabled={attendance !== 'working'}
-            className="att-btn text-xs px-2 py-1 rounded border border-gray-200 flex items-center gap-1 disabled:opacity-40"
+            className="att-btn"
           >
-            <span className="material-icons text-sm">free_breakfast</span>休憩
+            <span className="material-icons">free_breakfast</span>休憩
           </button>
           <button
             onClick={handleBreakEnd}
             disabled={attendance !== 'break'}
-            className="att-btn text-xs px-2 py-1 rounded border border-gray-200 flex items-center gap-1 disabled:opacity-40"
+            className="att-btn"
           >
-            <span className="material-icons text-sm">replay</span>戻り
+            <span className="material-icons">replay</span>戻り
           </button>
           <button
             onClick={handleClockOut}
             disabled={attendance === 'none'}
-            className="att-btn text-xs px-2 py-1 rounded border border-gray-200 flex items-center gap-1 disabled:opacity-40"
+            className="att-btn att-clockout"
           >
-            <span className="material-icons text-sm">logout</span>退勤
+            <span className="material-icons">logout</span>退勤
           </button>
+          {attStatus && <span className="att-status-label">{attStatus}</span>}
         </div>
-        {/* Notifications */}
+
         <button
           onClick={() => setShowNotifications(!showNotifications)}
-          className="relative p-2 hover:bg-gray-100 rounded-full"
+          className="header-icon-btn"
         >
           <span className="material-icons">notifications</span>
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {unreadCount}
-            </span>
-          )}
+          {unreadCount > 0 && <span className="header-notif-badge">{unreadCount}</span>}
         </button>
-        {/* User */}
-        <div className="flex items-center gap-2 ml-2">
-          <span className="text-sm font-medium">{user?.name}</span>
-          <span className="text-xs text-gray-500">
-            {user?.role ? ROLE_LABELS[user.role] : ''}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="p-2 hover:bg-gray-100 rounded-full"
-            title="ログアウト"
-          >
-            <span className="material-icons text-gray-500">logout</span>
+
+        <div className="header-user-menu">
+          <span className="header-user-name">{user?.name}</span>
+          <span className="header-user-role">{user?.role ? ROLE_LABELS[user.role] || user.role : ''}</span>
+          <button onClick={handleLogout} className="header-icon-btn" title="ログアウト">
+            <span className="material-icons">logout</span>
           </button>
         </div>
       </div>
 
-      {/* Notification Panel */}
       {showNotifications && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowNotifications(false)}
-          />
-          <div className="fixed top-0 right-0 w-96 h-full bg-white shadow-xl z-50 overflow-y-auto">
+          <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+          <div className="notification-panel open">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-bold">通知</h3>
               <button onClick={() => setShowNotifications(false)}>
@@ -110,21 +118,13 @@ export default function Header() {
               </button>
             </div>
             <div className="divide-y">
+              {notifications.length === 0 && (
+                <div className="p-6 text-center text-gray-400 text-sm">通知はありません</div>
+              )}
               {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-4 flex gap-3 ${!n.read ? 'bg-blue-50' : ''}`}
-                >
+                <div key={n.id} className={`p-4 flex gap-3 ${!n.read ? 'bg-blue-50' : ''}`}>
                   <span className="material-icons text-gray-400 shrink-0">
-                    {n.type === 'line_message'
-                      ? 'chat'
-                      : n.type === 'project'
-                        ? 'folder'
-                        : n.type === 'inspection'
-                          ? 'event'
-                          : n.type === 'followup'
-                            ? 'warning'
-                            : 'photo'}
+                    {n.type === 'line_message' ? 'chat' : n.type === 'project' ? 'folder' : n.type === 'inspection' ? 'event' : n.type === 'followup' ? 'warning' : 'photo'}
                   </span>
                   <div>
                     <p className="text-sm font-medium">{n.title}</p>
