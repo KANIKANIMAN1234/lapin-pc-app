@@ -101,10 +101,10 @@ export default function Header() {
           <button onClick={() => punch('clock_in', 'working')} disabled={attLoading || punching || attStatus !== 'none'} className="att-btn att-clockin">
             <span className="material-icons">login</span>出勤
           </button>
-          <button onClick={() => punch('break_start', 'break')} disabled={attLoading || punching || attStatus !== 'working'} className="att-btn">
+          <button onClick={() => punch('break_start', 'break')} disabled={attLoading || punching || attStatus !== 'working'} className="att-btn att-break">
             <span className="material-icons">free_breakfast</span>休憩
           </button>
-          <button onClick={() => punch('break_end', 'working')} disabled={attLoading || punching || attStatus !== 'break'} className="att-btn">
+          <button onClick={() => punch('break_end', 'working')} disabled={attLoading || punching || attStatus !== 'break'} className="att-btn att-return">
             <span className="material-icons">replay</span>戻り
           </button>
           <button onClick={() => punch('clock_out', 'left')} disabled={attLoading || punching || attStatus === 'none' || attStatus === 'left'} className="att-btn att-clockout">

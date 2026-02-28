@@ -27,13 +27,16 @@ body {
   font-size: 0.75rem; cursor: pointer; transition: all 0.2s; color: #374151;
 }
 .att-btn .material-icons { font-size: 16px; }
-.att-btn:hover:not(:disabled) { border-color: #06C755; color: #06C755; }
 .att-btn:active:not(:disabled) { transform: scale(0.96); }
 .att-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .att-btn.att-clockin { border-color: #06C755; color: #06C755; }
 .att-btn.att-clockin:hover:not(:disabled) { background: #06C755; color: white; }
-.att-btn.att-clockout { border-color: #9ca3af; }
-.att-btn.att-clockout:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+.att-btn.att-break { border-color: #f59e0b; color: #f59e0b; }
+.att-btn.att-break:hover:not(:disabled) { background: #f59e0b; color: white; }
+.att-btn.att-return { border-color: #3b82f6; color: #3b82f6; }
+.att-btn.att-return:hover:not(:disabled) { background: #3b82f6; color: white; }
+.att-btn.att-clockout { border-color: #ef4444; color: #ef4444; }
+.att-btn.att-clockout:hover:not(:disabled) { background: #ef4444; color: white; }
 .att-status-label { font-size: 0.7rem; color: #06C755; font-weight: 600; margin-left: 4px; white-space: nowrap; }
 .att-time-detail { font-weight: 400; font-size: 0.65rem; color: #6b7280; }
 .header-icon-btn {
