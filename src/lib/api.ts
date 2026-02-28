@@ -148,6 +148,9 @@ export const api = {
   getUserInfo: () =>
     requestGet<{ id: string; name: string; role: string; avatar_url?: string }>('getUserInfo'),
 
+  getBonusOverview: () =>
+    requestGet<unknown>('getBonusOverview'),
+
   uploadProfilePhoto: (photoData: string) =>
     requestPost<{ avatar_url: string; drive_url: string }>('uploadProfilePhoto', { photo_data: photoData }),
 };
