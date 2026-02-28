@@ -22,20 +22,28 @@ function generateRandomState(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
-export async function exchangeCodeForToken(code: string): Promise<string | null> {
-  // In production, this should be done server-side
-  // For now, call the GAS endpoint that handles token exchange
+export async function exchangeCodeForToken(code: string): Promise<{ token: string | null; error?: string }> {
+  const gasUrl = process.env.NEXT_PUBLIC_GAS_WEB_APP_URL;
+  if (!gasUrl) return { token: null, error: 'GAS_URL未設定' };
+  if (!LINE_LOGIN_CALLBACK_URL) return { token: null, error: 'CALLBACK_URL未設定' };
+
+  const url = `${gasUrl}?action=lineTokenExchange&code=${code}&redirect_uri=${encodeURIComponent(LINE_LOGIN_CALLBACK_URL)}`;
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_GAS_WEB_APP_URL}?action=lineTokenExchange&code=${code}&redirect_uri=${encodeURIComponent(LINE_LOGIN_CALLBACK_URL)}`
-    );
-    const data = await response.json();
-    if (data.success && data.data?.id_token) {
-      return data.data.id_token;
+    const response = await fetch(url);
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { token: null, error: `GASレスポンスがJSONでない (status=${response.status}): ${text.substring(0, 200)}` };
     }
-    return null;
-  } catch {
-    return null;
+    if (data.success && data.data?.id_token) {
+      return { token: data.data.id_token };
+    }
+    const errMsg = data.error?.message || data.error || JSON.stringify(data);
+    return { token: null, error: `GAS応答: ${errMsg}` };
+  } catch (err) {
+    return { token: null, error: `ネットワークエラー: ${String(err)}` };
   }
 }
 

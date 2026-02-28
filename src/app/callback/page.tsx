@@ -36,11 +36,12 @@ function CallbackHandler() {
 
     (async () => {
       try {
-        const idToken = await exchangeCodeForToken(code);
-        if (!idToken) {
-          setError('トークン交換に失敗しました。LINE Developersの設定を確認してください。');
+        const result = await exchangeCodeForToken(code);
+        if (!result.token) {
+          setError('トークン交換に失敗しました: ' + (result.error || '不明なエラー'));
           return;
         }
+        const idToken = result.token;
 
         const url = `${GAS_URL}?action=getUserInfo&token=${encodeURIComponent(idToken)}`;
         const res = await fetch(url);
