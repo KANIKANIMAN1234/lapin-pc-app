@@ -138,4 +138,10 @@ export const api = {
 
   saveCompanySettings: (data: Record<string, unknown>) =>
     requestPost<void>('saveCompanySettings', data),
+
+  getUserMapSettings: () =>
+    requestGet<Record<string, string>>('getUserMapSettings'),
+
+  saveUserMapSettings: (data: Record<string, unknown>) =>
+    requestPost<void>('saveUserMapSettings', data),
 };

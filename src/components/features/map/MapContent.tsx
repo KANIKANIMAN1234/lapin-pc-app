@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api, isApiConfigured } from '@/lib/api';
@@ -31,6 +31,7 @@ export interface MapCustomer {
   lastWork: string;
   address?: string;
   workHistory?: { date: string; work: string }[];
+  assignedTo?: string;
 }
 
 function createCustomIcon(status: string) {
@@ -43,12 +44,23 @@ function createCustomIcon(status: string) {
   });
 }
 
+function MapCenterUpdater({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+}
+
 interface MapContentProps {
   selectedCustomer: MapCustomer | null;
   onSelectCustomer: (customer: MapCustomer | null) => void;
+  center?: [number, number];
+  filterMyOnly?: boolean;
+  currentUserId?: string;
 }
 
-function MapContent({ selectedCustomer, onSelectCustomer }: MapContentProps) {
+function MapContent({ selectedCustomer, onSelectCustomer, center, filterMyOnly, currentUserId }: MapContentProps) {
   const [customers, setCustomers] = useState<MapCustomer[]>([]);
 
   useEffect(() => {
@@ -65,6 +77,7 @@ function MapContent({ selectedCustomer, onSelectCustomer }: MapContentProps) {
             status: p.status,
             lastWork: `${String(p.inquiry_date || '').substring(0, 7)} ${Array.isArray(p.work_type) ? p.work_type.join(',') : p.work_type || ''}`,
             address: p.address,
+            assignedTo: String((p as unknown as Record<string, unknown>).assigned_to || ''),
           }));
         setCustomers(mapped);
       }
@@ -78,17 +91,24 @@ function MapContent({ selectedCustomer, onSelectCustomer }: MapContentProps) {
     [selectedCustomer?.id, onSelectCustomer]
   );
 
-  const center: [number, number] = customers.length > 0
+  const defaultCenter: [number, number] = customers.length > 0
     ? [customers[0].lat, customers[0].lng]
     : [35.853, 139.412];
 
+  const mapCenter = center ?? defaultCenter;
+
+  const displayCustomers = filterMyOnly && currentUserId
+    ? customers.filter((c) => c.assignedTo === currentUserId)
+    : customers;
+
   return (
-    <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+    <MapContainer center={mapCenter} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {customers.map((customer) => (
+      {center && <MapCenterUpdater center={center} />}
+      {displayCustomers.map((customer) => (
         <Marker key={customer.id} position={[customer.lat, customer.lng]} icon={createCustomIcon(customer.status)} eventHandlers={{ click: () => handleMarkerClick(customer) }}>
           <Popup>
             <div className="text-sm">
