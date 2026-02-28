@@ -36,7 +36,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [salesMode, setSalesMode] = useState<SalesPeriodMode>('month');
 
-  const fetchDashboard = useCallback(() => {
+  const fetchDashboard = useCallback(async () => {
     if (!isApiConfigured()) { setLoading(false); return; }
     setLoading(true);
 
@@ -58,10 +58,22 @@ export default function DashboardPage() {
       endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
     }
 
-    api.getDashboard({ start_date: startDate, end_date: endDate }).then((res) => {
-      if (res.success && res.data) setData(res.data);
-      setLoading(false);
-    });
+    const params = { start_date: startDate, end_date: endDate };
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const res = await api.getDashboard(params);
+      if (res.success && res.data) {
+        setData(res.data);
+        setLoading(false);
+        return;
+      }
+      if (attempt < maxRetries - 1) {
+        console.log(`[Dashboard] リトライ ${attempt + 2}/${maxRetries}...`);
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+    setLoading(false);
   }, [period]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
