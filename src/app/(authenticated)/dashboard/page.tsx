@@ -349,7 +349,7 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          <div style={{ height: 350 }}>
+          <div style={{ height: 210 }}>
             {isSalesBar ? (
               <Bar data={salesChartConfig} options={salesChartOptions as never} />
             ) : (
