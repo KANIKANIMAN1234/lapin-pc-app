@@ -174,6 +174,12 @@ export const api = {
 
   createCostItem: (data: { project_id: string; cost_date: string; category: string; vendor_name: string; description: string; amount: number }) =>
     requestPost<{ id: number; project_id: string }>('createCostItem', data),
+
+  getMasters: () =>
+    requestGet<MasterData>('getMasters'),
+
+  saveMasters: (masterType: string, values: string[]) =>
+    requestPost<{ master_type: string; count: number }>('saveMasters', { master_type: masterType, values }),
 };
 
 export interface MeetingRecord {
@@ -198,4 +204,18 @@ export interface CostItem {
   description: string;
   amount: number;
   created_at: string;
+}
+
+export interface MasterData {
+  category: MasterItem[];
+  meeting_type: MasterItem[];
+  work_type: MasterItem[];
+  acquisition_route: MasterItem[];
+  [key: string]: MasterItem[];
+}
+
+export interface MasterItem {
+  id: number;
+  value: string;
+  sort_order: number;
 }

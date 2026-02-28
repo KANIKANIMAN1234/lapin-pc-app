@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { api, isApiConfigured } from '@/lib/api';
 
-type TabId = 'integration' | 'company' | 'employees';
+type TabId = 'integration' | 'company' | 'employees' | 'permissions' | 'masters';
 
 interface EmployeeRow {
   id: string;
@@ -120,6 +120,20 @@ export default function AdminPage() {
   const [retireDate, setRetireDate] = useState('');
   const [retireReason, setRetireReason] = useState('自己都合');
 
+  // Permissions tab
+  const [permEmployees, setPermEmployees] = useState<EmployeeRow[]>([]);
+  const [permChanges, setPermChanges] = useState<Record<string, string>>({});
+  const [permLoading, setPermLoading] = useState(false);
+  const [permSaving, setPermSaving] = useState(false);
+
+  // Masters tab
+  const [mastersData, setMastersData] = useState<Record<string, string[]>>({});
+  const [mastersLoading, setMastersLoading] = useState(false);
+  const [mastersLoaded, setMastersLoaded] = useState(false);
+  const [editingMaster, setEditingMaster] = useState<string | null>(null);
+  const [editMasterValues, setEditMasterValues] = useState<string[]>([]);
+  const [masterSaving, setMasterSaving] = useState(false);
+
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'success' });
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ show: true, message, type });
@@ -186,6 +200,43 @@ export default function AdminPage() {
       });
     }
   }, [activeTab, integrationLoaded]);
+
+  useEffect(() => {
+    if (activeTab === 'permissions' && permEmployees.length === 0 && isApiConfigured()) {
+      setPermLoading(true);
+      api.getEmployees().then((res) => {
+        if (res.success && res.data?.employees) {
+          setPermEmployees(res.data.employees.filter((e) => !(e as unknown as Record<string, unknown>).is_deleted).map((e) => ({
+            id: String(e.id),
+            name: e.name || '',
+            email: e.email || '',
+            role: e.role || 'staff',
+            line_user_id: e.line_user_id,
+            is_deleted: false,
+          })));
+        }
+        setPermLoading(false);
+      });
+    }
+  }, [activeTab, permEmployees.length]);
+
+  useEffect(() => {
+    if (activeTab === 'masters' && !mastersLoaded && isApiConfigured()) {
+      setMastersLoading(true);
+      api.getMasters().then((res) => {
+        if (res.success && res.data) {
+          const d = res.data as Record<string, Array<{value: string}>>;
+          const parsed: Record<string, string[]> = {};
+          for (const key of Object.keys(d)) {
+            parsed[key] = d[key].map((item) => item.value);
+          }
+          setMastersData(parsed);
+        }
+        setMastersLoaded(true);
+        setMastersLoading(false);
+      });
+    }
+  }, [activeTab, mastersLoaded]);
 
   useEffect(() => {
     if (activeTab === 'company' && !companyLoaded && isApiConfigured()) {
@@ -372,6 +423,8 @@ export default function AdminPage() {
           { id: 'integration' as TabId, label: '連携設定' },
           { id: 'company' as TabId, label: '企業情報' },
           { id: 'employees' as TabId, label: '従業員管理' },
+          { id: 'permissions' as TabId, label: 'アクセス権限' },
+          { id: 'masters' as TabId, label: 'マスター管理' },
         ].map((t) => (
           <button key={t.id} className={`admin-tab ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>{t.label}</button>
         ))}
@@ -845,6 +898,244 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ==================== アクセス権限タブ ==================== */}
+      {activeTab === 'permissions' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-icons text-green-600">security</span>
+              <h3 className="font-bold text-lg">アクセス権限設定</h3>
+            </div>
+            <button
+              className="btn-primary"
+              disabled={permSaving || Object.keys(permChanges).length === 0}
+              onClick={async () => {
+                setPermSaving(true);
+                const perms = Object.entries(permChanges).map(([employee_id, role]) => ({ employee_id, role }));
+                const res = await api.savePermissions(perms);
+                setPermSaving(false);
+                if (res.success) {
+                  showToast('権限設定を保存しました');
+                  setPermChanges({});
+                  setPermEmployees([]);
+                } else {
+                  showToast('保存に失敗しました', 'error');
+                }
+              }}
+            >
+              <span className="material-icons text-base">save</span>
+              {permSaving ? '保存中...' : '変更を保存'}
+              {Object.keys(permChanges).length > 0 && <span className="ml-1 bg-white/30 px-1.5 py-0.5 rounded text-xs">{Object.keys(permChanges).length}件</span>}
+            </button>
+          </div>
+
+          <div className="p-4">
+            <p className="text-sm text-gray-500 mb-4">
+              各従業員の役職を変更すると、アクセスできるページが自動的に切り替わります。
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+              {[
+                { role: '管理者 (admin)', pages: '全ページ + 管理画面' },
+                { role: '営業マネージャー (manager)', pages: '全ページ（管理画面除く）' },
+                { role: '営業 (sales)', pages: 'ダッシュボード, 案件, 経費, 顧客, 地図, 日報' },
+                { role: '事務 (office)', pages: 'ダッシュボード, 案件一覧, 経費, 管理（一部）' },
+                { role: 'スタッフ (staff)', pages: 'ダッシュボード, 案件一覧' },
+              ].map((r) => (
+                <div key={r.role} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+                  <span className="material-icons text-sm text-gray-400 mt-0.5">person</span>
+                  <div>
+                    <p className="text-sm font-medium">{r.role}</p>
+                    <p className="text-xs text-gray-500">{r.pages}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {permLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left border-t border-gray-100">
+                    <th className="px-4 py-3 font-medium text-gray-600">従業員名</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">メール</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">現在の役職</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">変更後</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {permEmployees.map((emp) => {
+                    const currentRole = permChanges[emp.id] || emp.role;
+                    const isChanged = permChanges[emp.id] !== undefined;
+                    return (
+                      <tr key={emp.id} className={`border-t border-gray-100 ${isChanged ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                        <td className="px-4 py-3 font-medium">{emp.name}</td>
+                        <td className="px-4 py-3 text-gray-500">{emp.email || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {ROLE_LABELS[emp.role] || emp.role}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            className="form-input text-sm py-1"
+                            value={currentRole}
+                            onChange={(e) => {
+                              const newRole = e.target.value;
+                              if (newRole === emp.role) {
+                                setPermChanges((prev) => { const n = { ...prev }; delete n[emp.id]; return n; });
+                              } else {
+                                setPermChanges((prev) => ({ ...prev, [emp.id]: newRole }));
+                              }
+                            }}
+                          >
+                            <option value="admin">管理者</option>
+                            <option value="manager">営業マネージャー</option>
+                            <option value="sales">営業</option>
+                            <option value="staff">スタッフ</option>
+                            <option value="office">事務</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {permEmployees.length === 0 && !permLoading && (
+                    <tr><td colSpan={4} className="text-center py-8 text-gray-400">従業員データがありません</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== マスター管理タブ ==================== */}
+      {activeTab === 'masters' && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-icons text-green-600">tune</span>
+            <h3 className="font-bold text-lg">マスター管理</h3>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">各マスターの選択肢を管理できます。追加・並び替え・削除が反映されます。</p>
+
+          {mastersLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { key: 'category', label: '原価カテゴリ', icon: 'receipt_long', desc: '原価明細で使用するカテゴリ' },
+                { key: 'meeting_type', label: '商談種別', icon: 'handshake', desc: '商談記録で使用する種別' },
+                { key: 'work_type', label: '工事種別', icon: 'construction', desc: '案件登録で使用する工事の種類' },
+                { key: 'acquisition_route', label: '集客ルート', icon: 'campaign', desc: '案件の集客経路' },
+              ].map((master) => {
+                const values = mastersData[master.key] || [];
+                const isEditing = editingMaster === master.key;
+
+                return (
+                  <div key={master.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <span className="material-icons text-gray-500 text-xl">{master.icon}</span>
+                        <div>
+                          <h4 className="font-bold text-sm">{master.label}</h4>
+                          <p className="text-xs text-gray-400">{master.desc}</p>
+                        </div>
+                      </div>
+                      {!isEditing ? (
+                        <button
+                          className="px-3 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1"
+                          onClick={() => {
+                            setEditingMaster(master.key);
+                            setEditMasterValues([...values]);
+                          }}
+                        >
+                          <span className="material-icons text-sm">edit</span>編集
+                        </button>
+                      ) : (
+                        <div className="flex gap-1">
+                          <button
+                            className="px-3 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50"
+                            onClick={() => setEditingMaster(null)}
+                          >
+                            キャンセル
+                          </button>
+                          <button
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            disabled={masterSaving}
+                            onClick={async () => {
+                              setMasterSaving(true);
+                              const filtered = editMasterValues.filter((v) => v.trim());
+                              const res = await api.saveMasters(master.key, filtered);
+                              setMasterSaving(false);
+                              if (res.success) {
+                                setMastersData((prev) => ({ ...prev, [master.key]: filtered }));
+                                setEditingMaster(null);
+                                showToast(`${master.label}を更新しました`);
+                              } else {
+                                showToast('保存に失敗しました', 'error');
+                              }
+                            }}
+                          >
+                            {masterSaving ? '保存中...' : '保存'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          {editMasterValues.map((val, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400 w-5 text-right">{idx + 1}</span>
+                              <input
+                                className="form-input flex-1 text-sm py-1.5"
+                                value={val}
+                                onChange={(e) => {
+                                  const newVals = [...editMasterValues];
+                                  newVals[idx] = e.target.value;
+                                  setEditMasterValues(newVals);
+                                }}
+                              />
+                              <button
+                                className="p-1 text-gray-400 hover:text-red-500"
+                                onClick={() => {
+                                  setEditMasterValues(editMasterValues.filter((_, i) => i !== idx));
+                                }}
+                              >
+                                <span className="material-icons text-sm">close</span>
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors inline-flex items-center justify-center gap-1"
+                            onClick={() => setEditMasterValues([...editMasterValues, ''])}
+                          >
+                            <span className="material-icons text-sm">add</span>項目を追加
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {values.length > 0 ? values.map((v, i) => (
+                            <span key={i} className="px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm">{v}</span>
+                          )) : (
+                            <p className="text-sm text-gray-400">未設定</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-4 pb-3">
+                      <span className="text-xs text-gray-400">{values.length}件の項目</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

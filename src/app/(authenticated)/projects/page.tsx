@@ -9,7 +9,7 @@ import type { Project } from '@/types';
 
 const WORK_TYPE_FILTERS = ['外壁塗装', '屋根塗装', '水回り', '内装'];
 const PAGE_SIZE = 10;
-const STATUS_OPTIONS = ['inquiry', 'estimate', 'followup_status', 'contract', 'in_progress', 'completed'] as const;
+const STATUS_OPTIONS = ['inquiry', 'estimate', 'followup_status', 'contract', 'in_progress', 'completed', 'lost'] as const;
 
 const formatAmount = (n: number) =>
   n >= 10000 ? `${Math.floor(n / 10000)}万` : n.toLocaleString();
