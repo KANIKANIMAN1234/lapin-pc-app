@@ -21,7 +21,7 @@ const PHOTO_TYPES = [
   { id: 'other', label: 'その他' },
 ];
 
-const MEETING_TYPES = ['訪問', '電話', 'オンライン', 'メール', '来店', 'その他'];
+const DEFAULT_MEETING_TYPES = ['訪問', '電話', 'オンライン', 'メール', '来店', 'その他'];
 
 const COST_CATEGORIES = [
   '材料費', '外注費', '人件費', '足場代', '運搬費', '廃材処理費', '諸経費', 'その他',
@@ -61,6 +61,7 @@ export default function ProjectDetailPage() {
     next_action: '',
   });
   const [meetingSaving, setMeetingSaving] = useState(false);
+  const [meetingTypes, setMeetingTypes] = useState<string[]>(DEFAULT_MEETING_TYPES);
   const [isRecording, setIsRecording] = useState(false);
   const [aiFormatting, setAiFormatting] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);
@@ -95,13 +96,20 @@ export default function ProjectDetailPage() {
     Promise.all([
       api.getProject(id),
       api.getPhotos(id),
-    ]).then(([projRes, photoRes]) => {
+      api.getMasters(),
+    ]).then(([projRes, photoRes, mastersRes]) => {
       if (projRes.success && projRes.data) {
         const p = (projRes.data as unknown as { project: Project }).project ?? projRes.data as unknown as Project;
         setProject(p);
         setStatus(p.status);
       }
       if (photoRes.success && photoRes.data?.photos) setPhotos(photoRes.data.photos);
+      if (mastersRes.success && mastersRes.data) {
+        const d = mastersRes.data as Record<string, Array<{ value: string }>>;
+        if (d.meeting_type && d.meeting_type.length > 0) {
+          setMeetingTypes(d.meeting_type.map((item) => item.value));
+        }
+      }
       setLoading(false);
     });
     loadMeetings();
@@ -595,7 +603,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">種別 *</label>
                   <select className="form-input w-full" value={meetingForm.meeting_type} onChange={(e) => setMeetingForm({ ...meetingForm, meeting_type: e.target.value })}>
-                    {MEETING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {meetingTypes.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
