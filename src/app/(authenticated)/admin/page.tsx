@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { api, isApiConfigured } from '@/lib/api';
 
-type TabId = 'integration' | 'company' | 'employees' | 'permissions' | 'masters';
+type TabId = 'integration' | 'company' | 'employees' | 'permissions' | 'masters' | 'ai_prompts';
 
 interface EmployeeRow {
   id: string;
@@ -136,6 +136,12 @@ export default function AdminPage() {
   const [editMasterValues, setEditMasterValues] = useState<string[]>([]);
   const [masterSaving, setMasterSaving] = useState(false);
 
+  // AI Prompts tab
+  const [aiPrompts, setAiPrompts] = useState<{ key: string; label: string; prompt: string }[]>([]);
+  const [aiPromptsLoading, setAiPromptsLoading] = useState(false);
+  const [aiPromptsLoaded, setAiPromptsLoaded] = useState(false);
+  const [aiPromptSaving, setAiPromptSaving] = useState<string | null>(null);
+
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'success' });
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ show: true, message, type });
@@ -263,6 +269,19 @@ export default function AdminPage() {
       });
     }
   }, [activeTab, companyLoaded]);
+
+  useEffect(() => {
+    if (activeTab === 'ai_prompts' && !aiPromptsLoaded && isApiConfigured()) {
+      setAiPromptsLoading(true);
+      api.getAiPrompts().then((res) => {
+        if (res.success && res.data?.prompts) {
+          setAiPrompts(res.data.prompts.map((p) => ({ key: p.key, label: p.label, prompt: p.prompt })));
+        }
+        setAiPromptsLoaded(true);
+        setAiPromptsLoading(false);
+      });
+    }
+  }, [activeTab, aiPromptsLoaded]);
 
   if (user?.role !== 'admin') {
     return (
@@ -431,6 +450,7 @@ export default function AdminPage() {
           { id: 'employees' as TabId, label: '従業員管理' },
           { id: 'permissions' as TabId, label: 'アクセス権限' },
           { id: 'masters' as TabId, label: 'マスター管理' },
+          { id: 'ai_prompts' as TabId, label: 'AIプロンプト' },
         ].map((t) => (
           <button key={t.id} className={`admin-tab ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>{t.label}</button>
         ))}
@@ -1201,6 +1221,78 @@ export default function AdminPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== AIプロンプト設定タブ ==================== */}
+      {activeTab === 'ai_prompts' && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-icons text-purple-600">psychology</span>
+            <h3 className="font-bold text-lg">AIプロンプト設定</h3>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">
+            各画面の音声入力後のAI文字整形で使用されるプロンプトを編集できます。
+            変更は即座に全ユーザーに反映されます。
+          </p>
+
+          {aiPromptsLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
+          ) : aiPrompts.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <span className="material-icons text-4xl mb-2 block">psychology</span>
+              <p className="text-sm">プロンプトがありません。GASを再デプロイしてください。</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {aiPrompts.map((item, idx) => (
+                <div key={item.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="material-icons text-purple-400 text-xl">smart_toy</span>
+                      <div>
+                        <h4 className="font-bold text-sm">{item.label}</h4>
+                        <p className="text-xs text-gray-400">キー: {item.key}</p>
+                      </div>
+                    </div>
+                    <button
+                      className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 inline-flex items-center gap-1"
+                      disabled={aiPromptSaving === item.key}
+                      onClick={async () => {
+                        setAiPromptSaving(item.key);
+                        const res = await api.saveAiPrompts([item]);
+                        setAiPromptSaving(null);
+                        if (res.success) {
+                          showToast(`「${item.label}」のプロンプトを保存しました`);
+                        } else {
+                          showToast('保存に失敗しました', 'error');
+                        }
+                      }}
+                    >
+                      <span className="material-icons text-sm">save</span>
+                      {aiPromptSaving === item.key ? '保存中...' : '保存'}
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    <textarea
+                      className="form-input w-full text-sm font-mono leading-relaxed"
+                      rows={6}
+                      value={item.prompt}
+                      onChange={(e) => {
+                        const newPrompts = [...aiPrompts];
+                        newPrompts[idx] = { ...item, prompt: e.target.value };
+                        setAiPrompts(newPrompts);
+                      }}
+                      placeholder="AIに渡すシステムプロンプトを入力..."
+                    />
+                    <p className="text-xs text-gray-400 mt-2">
+                      ※ 音声入力で取得したテキストがユーザー入力として渡されます。上記のプロンプトはAIへの指示（システムプロンプト）です。
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -181,8 +181,8 @@ export const api = {
   saveMasters: (masterType: string, values: string[]) =>
     requestPost<{ master_type: string; count: number }>('saveMasters', { master_type: masterType, values }),
 
-  formatText: (inputText: string, formatType: string = 'meeting') =>
-    requestPost<{ formatted_text: string }>('formatText', { input_text: inputText, format_type: formatType }),
+  formatText: (inputText: string, promptKey?: string, formatType?: string) =>
+    requestPost<{ formatted_text: string }>('formatText', { input_text: inputText, prompt_key: promptKey || '', format_type: formatType || '' }),
 
   getPagePermissions: () =>
     requestGet<PagePermissionsData>('getPagePermissions'),
@@ -210,6 +210,12 @@ export const api = {
 
   createNotice: (data: { title?: string; body: string; category?: string; is_pinned?: boolean }) =>
     requestPost<Notice>('createNotice', data),
+
+  getAiPrompts: () =>
+    requestGet<{ prompts: AiPromptItem[] }>('getAiPrompts'),
+
+  saveAiPrompts: (prompts: AiPromptItem[]) =>
+    requestPost<{ message: string }>('saveAiPrompts', { prompts }),
 };
 
 export interface MeetingRecord {
@@ -276,6 +282,13 @@ export interface DailyReport {
   next_actions: unknown[];
   submitted_at: string;
   created_at: string;
+}
+
+export interface AiPromptItem {
+  key: string;
+  label: string;
+  prompt: string;
+  updated_at?: string;
 }
 
 export interface Notice {
