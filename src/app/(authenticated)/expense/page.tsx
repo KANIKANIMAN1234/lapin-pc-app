@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { api, isApiConfigured } from '@/lib/api';
 import type { Project } from '@/types';
 
-const CATEGORY_OPTIONS = ['材料費', '交通費', '外注費', '消耗品費', '飲食費', 'その他'] as const;
+const DEFAULT_CATEGORIES = ['材料費', '交通費', '外注費', '消耗品費', '飲食費', 'その他'];
 
 interface ExpenseRow {
   id: string;
@@ -28,6 +28,7 @@ export default function ExpensePage() {
   const [ocrLoading, setOcrLoading] = useState(false);
 
   const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
   const [project, setProject] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -44,12 +45,19 @@ export default function ExpensePage() {
     Promise.all([
       api.getProjects({ limit: '200' }),
       api.getExpenses({ limit: '100' }),
-    ]).then(([projRes, expRes]) => {
+      api.getMasters(),
+    ]).then(([projRes, expRes, mastersRes]) => {
       if (projRes.success && projRes.data?.projects) {
         setProjectOptions(projRes.data.projects.map((p: Project) => ({
           value: String(p.id),
           label: `${p.project_number} ${p.customer_name}`,
         })));
+      }
+      if (mastersRes.success && mastersRes.data) {
+        const d = mastersRes.data as Record<string, Array<{ value: string }>>;
+        if (d.category && d.category.length > 0) {
+          setCategoryOptions(d.category.map((item) => item.value));
+        }
       }
       if (expRes.success && expRes.data?.expenses) {
         const raw = expRes.data.expenses as unknown as Record<string, unknown>[];
@@ -212,7 +220,7 @@ export default function ExpensePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-input">
-                  {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
