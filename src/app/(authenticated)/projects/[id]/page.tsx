@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, isApiConfigured } from '@/lib/api';
 import type { MeetingRecord, CostItem } from '@/lib/api';
 import { STATUS_LABELS } from '@/lib/mockProjects';
 import type { Project, Photo, ProjectStatus } from '@/types';
+
+type SpeechRecognitionType = typeof window extends { SpeechRecognition: infer T } ? T : unknown;
 
 const PHOTO_TYPES = [
   { id: 'before', label: '契約前' },
@@ -59,6 +61,9 @@ export default function ProjectDetailPage() {
     next_action: '',
   });
   const [meetingSaving, setMeetingSaving] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [aiFormatting, setAiFormatting] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionType | null>(null);
 
   const [costModal, setCostModal] = useState(false);
   const [costForm, setCostForm] = useState({
@@ -137,6 +142,56 @@ export default function ProjectDetailPage() {
       setEditing(false);
     }
   };
+
+  const toggleVoiceInput = useCallback(() => {
+    if (isRecording) {
+      const rec = recognitionRef.current as { stop?: () => void } | null;
+      rec?.stop?.();
+      setIsRecording(false);
+      return;
+    }
+    const W = window as unknown as Record<string, unknown>;
+    const SpeechRec = (W.SpeechRecognition || W.webkitSpeechRecognition) as { new(): {
+      lang: string; continuous: boolean; interimResults: boolean;
+      onresult: (e: { results: { isFinal: boolean;[n: number]: { transcript: string } }[] }) => void;
+      onerror: () => void; onend: () => void; start: () => void; stop: () => void;
+    } } | undefined;
+    if (!SpeechRec) { alert('このブラウザは音声入力に対応していません'); return; }
+    const rec = new SpeechRec();
+    rec.lang = 'ja-JP';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (e) => {
+      let transcript = '';
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      setMeetingForm((prev) => ({ ...prev, content: prev.content.split('\n【音声入力中】')[0] + (transcript ? '\n【音声入力中】' + transcript : '') }));
+      const allFinal = Array.from(e.results).every((r) => r.isFinal);
+      if (allFinal && transcript) {
+        setMeetingForm((prev) => {
+          const base = prev.content.split('\n【音声入力中】')[0];
+          return { ...prev, content: (base ? base + '\n' : '') + transcript };
+        });
+      }
+    };
+    rec.onerror = () => setIsRecording(false);
+    rec.onend = () => setIsRecording(false);
+    rec.start();
+    recognitionRef.current = rec as unknown as SpeechRecognitionType;
+    setIsRecording(true);
+  }, [isRecording]);
+
+  const handleAiFormat = useCallback(async () => {
+    const raw = meetingForm.content.split('\n【音声入力中】')[0].trim();
+    if (!raw) return;
+    setAiFormatting(true);
+    const res = await api.formatText(raw, 'meeting');
+    if (res.success && res.data?.formatted_text) {
+      setMeetingForm((prev) => ({ ...prev, content: res.data!.formatted_text }));
+    }
+    setAiFormatting(false);
+  }, [meetingForm.content]);
 
   const handleCreateMeeting = async () => {
     if (!meetingForm.content.trim()) return;
@@ -549,8 +604,45 @@ export default function ProjectDetailPage() {
                 <input className="form-input w-full" placeholder="例: 山田太郎, 高橋花子" value={meetingForm.attendees} onChange={(e) => setMeetingForm({ ...meetingForm, attendees: e.target.value })} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">内容 *</label>
-                <textarea className="form-input w-full" rows={5} placeholder="商談の内容を記録してください" value={meetingForm.content} onChange={(e) => setMeetingForm({ ...meetingForm, content: e.target.value })} />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">内容 *</label>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={toggleVoiceInput}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        isRecording
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      <span className="material-icons text-sm">{isRecording ? 'stop' : 'mic'}</span>
+                      {isRecording ? '停止' : '音声入力'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAiFormat}
+                      disabled={aiFormatting || !meetingForm.content.split('\n【音声入力中】')[0].trim()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <span className="material-icons text-sm">auto_fix_high</span>
+                      {aiFormatting ? 'AI整形中...' : 'AI議事録整形'}
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  className={`form-input w-full ${isRecording ? 'border-red-300 bg-red-50/30' : ''}`}
+                  rows={7}
+                  placeholder={isRecording ? '音声を認識しています...' : '商談の内容を記録してください（音声入力も可能）'}
+                  value={meetingForm.content}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, content: e.target.value })}
+                />
+                {isRecording && (
+                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    音声認識中...マイクに向かって話してください
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">次のアクション</label>

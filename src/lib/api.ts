@@ -180,6 +180,9 @@ export const api = {
 
   saveMasters: (masterType: string, values: string[]) =>
     requestPost<{ master_type: string; count: number }>('saveMasters', { master_type: masterType, values }),
+
+  formatText: (inputText: string, formatType: string = 'meeting') =>
+    requestPost<{ formatted_text: string }>('formatText', { input_text: inputText, format_type: formatType }),
 };
 
 export interface MeetingRecord {
