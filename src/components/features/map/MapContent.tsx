@@ -58,14 +58,17 @@ interface MapContentProps {
   center?: [number, number];
   filterMyOnly?: boolean;
   currentUserId?: string;
+  focusProjectId?: string;
+  onFocusResolved?: (customer: MapCustomer, coords: [number, number]) => void;
 }
 
-function MapContent({ selectedCustomer, onSelectCustomer, center, filterMyOnly, currentUserId }: MapContentProps) {
+function MapContent({ selectedCustomer, onSelectCustomer, center, filterMyOnly, currentUserId, focusProjectId, onFocusResolved }: MapContentProps) {
   const [customers, setCustomers] = useState<MapCustomer[]>([]);
+  const [focusHandled, setFocusHandled] = useState(false);
 
   useEffect(() => {
     if (!isApiConfigured()) return;
-    api.getProjects({ limit: '500' }).then((res) => {
+    api.getProjects({ limit: '500' }).then(async (res) => {
       if (res.success && res.data?.projects) {
         const mapped = res.data.projects
           .filter((p: Project) => p.lat && p.lng)
@@ -80,9 +83,38 @@ function MapContent({ selectedCustomer, onSelectCustomer, center, filterMyOnly, 
             assignedTo: String((p as unknown as Record<string, unknown>).assigned_to || ''),
           }));
         setCustomers(mapped);
+
+        if (focusProjectId && !focusHandled && onFocusResolved) {
+          let target = mapped.find((c) => c.id === focusProjectId);
+          if (target) {
+            onFocusResolved(target, [target.lat, target.lng]);
+            setFocusHandled(true);
+          } else {
+            const proj = res.data.projects.find((p: Project) => String(p.id) === focusProjectId);
+            if (proj && proj.address) {
+              try {
+                const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(proj.address)}&limit=1`);
+                const results = await resp.json();
+                if (results.length > 0) {
+                  const lat = Number(results[0].lat);
+                  const lng = Number(results[0].lon);
+                  target = {
+                    id: String(proj.id), name: proj.customer_name, lat, lng,
+                    status: proj.status, lastWork: Array.isArray(proj.work_type) ? proj.work_type.join(',') : proj.work_type || '',
+                    address: proj.address,
+                    assignedTo: String((proj as unknown as Record<string, unknown>).assigned_to || ''),
+                  };
+                  setCustomers((prev) => [...prev, target!]);
+                  onFocusResolved(target, [lat, lng]);
+                }
+              } catch { /* geocode failed */ }
+              setFocusHandled(true);
+            }
+          }
+        }
       }
     });
-  }, []);
+  }, [focusProjectId, focusHandled, onFocusResolved]);
 
   const handleMarkerClick = useCallback(
     (customer: MapCustomer) => {

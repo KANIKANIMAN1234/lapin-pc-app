@@ -314,7 +314,9 @@ export default function ProjectDetailPage() {
                     <input className="form-input w-full" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
                   ) : (
                     <span>{project.address}{' '}
-                      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(project.address)}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">地図</a>
+                      <Link href={`/map?focus=${project.id}`} className="text-blue-600 hover:underline text-sm inline-flex items-center gap-0.5">
+                        <span className="material-icons" style={{ fontSize: 14 }}>map</span>地図
+                      </Link>
                     </span>
                   )}
                 </DetailRow>

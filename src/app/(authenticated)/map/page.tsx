@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import type { MapCustomer } from '@/components/features/map/MapContent';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
+import { useSearchParams } from 'next/navigation';
 import { api, isApiConfigured } from '@/lib/api';
 
 const MapContent = dynamic(() => import('@/components/features/map/MapContent'), { ssr: false });
@@ -20,9 +21,12 @@ const DEFAULT_CENTER: [number, number] = [35.853, 139.412];
 
 export default function MapPage() {
   const { user } = useAuthStore();
+  const searchParams = useSearchParams();
+  const focusProjectId = searchParams.get('focus') || '';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<MapCustomer | null>(null);
   const [showAreaModal, setShowAreaModal] = useState(false);
+  const [focusCenter, setFocusCenter] = useState<[number, number] | null>(null);
 
   const [areaType, setAreaType] = useState<'company' | 'custom'>('company');
   const [customAddress, setCustomAddress] = useState('');
@@ -162,9 +166,14 @@ export default function MapPage() {
           <MapContent
             selectedCustomer={selectedCustomer}
             onSelectCustomer={setSelectedCustomer}
-            center={savedCenter}
+            center={focusCenter || savedCenter}
             filterMyOnly={filterMyOnly}
             currentUserId={user?.id ? String(user.id) : undefined}
+            focusProjectId={focusProjectId}
+            onFocusResolved={(customer, coords) => {
+              setSelectedCustomer(customer);
+              setFocusCenter(coords);
+            }}
           />
         </div>
         <div className="customer-info-panel">
