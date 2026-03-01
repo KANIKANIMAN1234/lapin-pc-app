@@ -904,13 +904,13 @@ export default function AdminPage() {
       {/* ==================== アクセス権限タブ ==================== */}
       {activeTab === 'permissions' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="material-icons text-green-600">security</span>
-              <h3 className="font-bold text-lg">アクセス権限設定</h3>
+              <span className="material-icons text-green-600 text-lg">security</span>
+              <h3 className="font-bold text-sm">アクセス権限設定</h3>
             </div>
             <button
-              className="btn-primary"
+              className="btn-primary text-xs py-1.5 px-3"
               disabled={permSaving || Object.keys(permChanges).length === 0}
               onClick={async () => {
                 setPermSaving(true);
@@ -926,46 +926,41 @@ export default function AdminPage() {
                 }
               }}
             >
-              <span className="material-icons text-base">save</span>
+              <span className="material-icons text-sm">save</span>
               {permSaving ? '保存中...' : '変更を保存'}
-              {Object.keys(permChanges).length > 0 && <span className="ml-1 bg-white/30 px-1.5 py-0.5 rounded text-xs">{Object.keys(permChanges).length}件</span>}
+              {Object.keys(permChanges).length > 0 && <span className="ml-1 bg-white/30 px-1 py-0.5 rounded text-[10px]">{Object.keys(permChanges).length}件</span>}
             </button>
           </div>
 
-          <div className="p-4">
-            <p className="text-sm text-gray-500 mb-4">
-              各従業員の役職を変更すると、アクセスできるページが自動的に切り替わります。
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+          <div className="px-4 py-2">
+            <p className="text-xs text-gray-400 mb-2">役職を変更するとアクセスできるページが自動的に切り替わります。</p>
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {[
-                { role: '管理者 (admin)', pages: '全ページ + 管理画面' },
-                { role: '営業マネージャー (manager)', pages: '全ページ（管理画面除く）' },
-                { role: '営業 (sales)', pages: 'ダッシュボード, 案件, 経費, 顧客, 地図, 日報' },
-                { role: '事務 (office)', pages: 'ダッシュボード, 案件一覧, 経費, 管理（一部）' },
-                { role: 'スタッフ (staff)', pages: 'ダッシュボード, 案件一覧' },
+                { role: '管理者', pages: '全ページ+管理' },
+                { role: 'マネージャー', pages: '全ページ(管理除く)' },
+                { role: '営業', pages: 'ダッシュボード,案件,経費,地図' },
+                { role: '事務', pages: 'ダッシュボード,案件,経費,管理(一部)' },
+                { role: 'スタッフ', pages: 'ダッシュボード,案件' },
               ].map((r) => (
-                <div key={r.role} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
-                  <span className="material-icons text-sm text-gray-400 mt-0.5">person</span>
-                  <div>
-                    <p className="text-sm font-medium">{r.role}</p>
-                    <p className="text-xs text-gray-500">{r.pages}</p>
-                  </div>
+                <div key={r.role} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-[11px]">
+                  <span className="font-medium text-gray-700">{r.role}</span>
+                  <span className="text-gray-400">: {r.pages}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {permLoading ? (
-            <div className="flex items-center justify-center py-12"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>
+            <div className="flex items-center justify-center py-8"><div className="spinner" /><p className="ml-3 text-gray-500 text-sm">読み込み中...</p></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left border-t border-gray-100">
-                    <th className="px-4 py-3 font-medium text-gray-600">従業員名</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">メール</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">現在の役職</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">変更後</th>
+                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">従業員名</th>
+                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">メール</th>
+                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">現在の役職</th>
+                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">変更後</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -974,16 +969,16 @@ export default function AdminPage() {
                     const isChanged = permChanges[emp.id] !== undefined;
                     return (
                       <tr key={emp.id} className={`border-t border-gray-100 ${isChanged ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                        <td className="px-4 py-3 font-medium">{emp.name}</td>
-                        <td className="px-4 py-3 text-gray-500">{emp.email || '-'}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                        <td className="px-4 py-2 font-medium text-sm">{emp.name}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{emp.email || '-'}</td>
+                        <td className="px-4 py-2">
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
                             {ROLE_LABELS[emp.role] || emp.role}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-2">
                           <select
-                            className="form-input text-sm py-1"
+                            className="form-input text-xs py-1"
                             value={currentRole}
                             onChange={(e) => {
                               const newRole = e.target.value;
@@ -1005,7 +1000,7 @@ export default function AdminPage() {
                     );
                   })}
                   {permEmployees.length === 0 && !permLoading && (
-                    <tr><td colSpan={4} className="text-center py-8 text-gray-400">従業員データがありません</td></tr>
+                    <tr><td colSpan={4} className="text-center py-6 text-gray-400 text-sm">従業員データがありません</td></tr>
                   )}
                 </tbody>
               </table>
