@@ -25,6 +25,7 @@ export default function Header() {
   const [clockOutTime, setClockOutTime] = useState('');
   const [punching, setPunching] = useState(false);
   const [attLoading, setAttLoading] = useState(true);
+  const [brandName, setBrandName] = useState('ラパンリフォーム');
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
@@ -39,6 +40,15 @@ export default function Header() {
         if (d.clock_out) setClockOutTime(d.clock_out);
       }
     }).catch(() => {}).finally(() => setAttLoading(false));
+
+    api.getCompanySettings().then((res) => {
+      if (res.success && res.data) {
+        const d = res.data as Record<string, string>;
+        const display = d.header_display || 'trade';
+        const name = display === 'company' ? (d.company_name || '') : (d.trade_name || '');
+        if (name) setBrandName(name);
+      }
+    }).catch(() => {});
   }, []);
 
   const handleLogout = () => { logout(); router.replace('/'); };
@@ -91,7 +101,7 @@ export default function Header() {
       <div className="header-bar-left">
         <span className="material-icons header-logo-icon">business</span>
         <div>
-          <h1 className="header-brand-title">ラパンリフォーム</h1>
+          <h1 className="header-brand-title">{brandName}</h1>
           <span className="header-brand-sub">LINE公式アカウント連携</span>
         </div>
       </div>
