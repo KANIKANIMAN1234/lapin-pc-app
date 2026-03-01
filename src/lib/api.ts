@@ -189,6 +189,15 @@ export const api = {
 
   savePagePermissions: (data: { role_master?: Record<string, Record<string, boolean>>; user_permissions?: { user_id: string; pages: Record<string, boolean> }[] }) =>
     requestPost<{ message: string }>('savePagePermissions', data),
+
+  getAccountPhotos: () =>
+    requestGet<{ photos: AccountPhoto[]; max: number }>('getAccountPhotos'),
+
+  uploadAccountPhoto: (photoData: string, name?: string) =>
+    requestPost<{ photo: AccountPhoto; photos: AccountPhoto[]; count: number; max: number }>('uploadAccountPhoto', { photo_data: photoData, name: name || '' }),
+
+  deleteAccountPhoto: (photoId: string) =>
+    requestPost<{ photos: AccountPhoto[]; count: number; max: number }>('deleteAccountPhoto', { photo_id: photoId }),
 };
 
 export interface MeetingRecord {
@@ -232,4 +241,11 @@ export interface MasterItem {
   id: number;
   value: string;
   sort_order: number;
+}
+
+export interface AccountPhoto {
+  id: string;
+  url: string;
+  name: string;
+  created_at: string;
 }

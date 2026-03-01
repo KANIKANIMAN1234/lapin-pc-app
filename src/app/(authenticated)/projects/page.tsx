@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, isApiConfigured } from '@/lib/api';
@@ -75,6 +75,81 @@ export default function ProjectsListPage() {
   const years = ['2026', '2025', '2024'];
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleExportCsv = () => {
+    const header = ['管理番号', '顧客名', '住所', '電話番号', '工事種別', '見込み金額', '契約金額', '営業担当者', 'ステータス', '問い合わせ日', '備考'];
+    const rows = filtered.map((p) => [
+      p.project_number || '',
+      p.customer_name || '',
+      p.address || '',
+      p.phone || '',
+      Array.isArray(p.work_type) ? p.work_type.join(',') : p.work_type || '',
+      String(p.estimated_amount || ''),
+      String(p.contract_amount || ''),
+      p.assigned_to_name || '',
+      STATUS_LABELS[p.status]?.label ?? p.status,
+      String(p.inquiry_date || '').substring(0, 10),
+      p.notes || '',
+    ]);
+    const bom = '\uFEFF';
+    const csv = bom + [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `案件一覧_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter((l) => l.trim());
+      if (lines.length < 2) { alert('CSVにデータ行がありません'); setImporting(false); return; }
+
+      const headerLine = lines[0].replace(/^\uFEFF/, '');
+      const headers = headerLine.split(',').map((h) => h.replace(/^"|"$/g, '').trim());
+
+      let created = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map((v) => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) || [];
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+
+        const custName = row['顧客名'] || row['customer_name'];
+        if (!custName) continue;
+
+        try {
+          await api.createProject({
+            customer_name: custName,
+            address: row['住所'] || row['address'] || '',
+            phone: row['電話番号'] || row['phone'] || '000-0000-0000',
+            work_description: row['工事種別'] || row['work_type'] || '',
+            work_type: (row['工事種別'] || row['work_type'] || 'その他').split(',').map((s: string) => s.trim()),
+            estimated_amount: Number(row['見込み金額'] || row['estimated_amount'] || 0),
+            acquisition_route: row['集客ルート'] || row['acquisition_route'] || 'その他',
+            inquiry_date: row['問い合わせ日'] || row['inquiry_date'] || new Date().toISOString().slice(0, 10),
+            notes: row['備考'] || row['notes'] || '',
+          });
+          created++;
+        } catch { /* skip failed row */ }
+      }
+
+      alert(`${created}件の案件を取り込みました`);
+      window.location.reload();
+    } catch (err) {
+      alert('CSVの読み込みに失敗しました: ' + (err instanceof Error ? err.message : ''));
+    }
+    setImporting(false);
+    if (importRef.current) importRef.current.value = '';
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-[400px]"><div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p></div>;
   }
@@ -83,9 +158,27 @@ export default function ProjectsListPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold">案件一覧（{filtered.length}件）</h2>
-        <Link href="/projects/new" className="btn-primary inline-flex items-center gap-2">
-          <span className="material-icons text-lg">add</span>新規登録
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          >
+            <span className="material-icons text-base">download</span>一括出力
+          </button>
+          <button
+            type="button"
+            onClick={() => importRef.current?.click()}
+            disabled={importing}
+            className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            <span className="material-icons text-base">upload</span>{importing ? '取込中...' : '一括取り込み'}
+          </button>
+          <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImportCsv} />
+          <Link href="/projects/new" className="btn-primary inline-flex items-center gap-2">
+            <span className="material-icons text-lg">add</span>新規登録
+          </Link>
+        </div>
       </div>
 
       <div className="search-panel">
