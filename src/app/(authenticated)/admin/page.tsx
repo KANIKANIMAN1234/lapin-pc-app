@@ -120,11 +120,13 @@ export default function AdminPage() {
   const [retireDate, setRetireDate] = useState('');
   const [retireReason, setRetireReason] = useState('自己都合');
 
-  // Permissions tab
+  // Permissions tab - page access
   const [permEmployees, setPermEmployees] = useState<EmployeeRow[]>([]);
-  const [permChanges, setPermChanges] = useState<Record<string, string>>({});
   const [permLoading, setPermLoading] = useState(false);
   const [permSaving, setPermSaving] = useState(false);
+  const [permLoaded, setPermLoaded] = useState(false);
+  const [roleMaster, setRoleMaster] = useState<Record<string, Record<string, boolean>>>({});
+  const [userPerms, setUserPerms] = useState<Record<string, Record<string, boolean>>>({});
 
   // Masters tab
   const [mastersData, setMastersData] = useState<Record<string, string[]>>({});
@@ -202,23 +204,27 @@ export default function AdminPage() {
   }, [activeTab, integrationLoaded]);
 
   useEffect(() => {
-    if (activeTab === 'permissions' && permEmployees.length === 0 && isApiConfigured()) {
+    if (activeTab === 'permissions' && !permLoaded && isApiConfigured()) {
       setPermLoading(true);
-      api.getEmployees().then((res) => {
-        if (res.success && res.data?.employees) {
-          setPermEmployees(res.data.employees.filter((e) => !(e as unknown as Record<string, unknown>).is_deleted).map((e) => ({
-            id: String(e.id),
-            name: e.name || '',
-            email: e.email || '',
-            role: e.role || 'staff',
-            line_user_id: e.line_user_id,
-            is_deleted: false,
+      Promise.all([api.getEmployees(), api.getPagePermissions()]).then(([empRes, permRes]) => {
+        if (empRes.success && empRes.data?.employees) {
+          setPermEmployees(empRes.data.employees.filter((e) => !(e as unknown as Record<string, unknown>).is_deleted).map((e) => ({
+            id: String(e.id), name: e.name || '', email: e.email || '', role: e.role || 'staff',
+            line_user_id: e.line_user_id, is_deleted: false,
           })));
         }
+        if (permRes.success && permRes.data) {
+          const d = permRes.data as { role_master: Record<string, Record<string, boolean>>; user_permissions: { user_id: string; pages: Record<string, boolean> }[] };
+          setRoleMaster(d.role_master || {});
+          const uMap: Record<string, Record<string, boolean>> = {};
+          (d.user_permissions || []).forEach((up) => { uMap[up.user_id] = up.pages; });
+          setUserPerms(uMap);
+        }
+        setPermLoaded(true);
         setPermLoading(false);
       });
     }
-  }, [activeTab, permEmployees.length]);
+  }, [activeTab, permLoaded]);
 
   useEffect(() => {
     if (activeTab === 'masters' && !mastersLoaded && isApiConfigured()) {
@@ -902,112 +908,178 @@ export default function AdminPage() {
       )}
 
       {/* ==================== アクセス権限タブ ==================== */}
-      {activeTab === 'permissions' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-icons text-green-600 text-lg">security</span>
-              <h3 className="font-bold text-sm">アクセス権限設定</h3>
-            </div>
-            <button
-              className="btn-primary text-xs py-1.5 px-3"
-              disabled={permSaving || Object.keys(permChanges).length === 0}
-              onClick={async () => {
-                setPermSaving(true);
-                const perms = Object.entries(permChanges).map(([employee_id, role]) => ({ employee_id, role }));
-                const res = await api.savePermissions(perms);
-                setPermSaving(false);
-                if (res.success) {
-                  showToast('権限設定を保存しました');
-                  setPermChanges({});
-                  setPermEmployees([]);
-                } else {
-                  showToast('保存に失敗しました', 'error');
-                }
-              }}
-            >
-              <span className="material-icons text-sm">save</span>
-              {permSaving ? '保存中...' : '変更を保存'}
-              {Object.keys(permChanges).length > 0 && <span className="ml-1 bg-white/30 px-1 py-0.5 rounded text-[10px]">{Object.keys(permChanges).length}件</span>}
-            </button>
-          </div>
+      {activeTab === 'permissions' && (() => {
+        const PAGE_KEYS = ['dashboard', 'projects', 'expense', 'followup', 'inspection', 'map', 'thankyou', 'bonus', 'admin', 'mobileRegister'] as const;
+        const PAGE_LABELS: Record<string, string> = {
+          dashboard: 'ダッシュボード', projects: '案件一覧', expense: '経費登録',
+          followup: '追客管理', inspection: '点検スケジュール', map: '地図表示',
+          thankyou: 'お礼状・DM', bonus: 'ボーナス計算', admin: '管理', mobileRegister: 'SP新規登録',
+        };
+        const ROLE_DEFS = [
+          { key: 'admin', label: '管理者', icon: 'admin_panel_settings' },
+          { key: 'manager', label: '営業マネージャー', icon: 'supervisor_account' },
+          { key: 'sales', label: '営業', icon: 'person' },
+          { key: 'office', label: '事務', icon: 'edit_note' },
+        ];
 
-          <div className="px-4 py-2">
-            <p className="text-xs text-gray-400 mb-2">役職を変更するとアクセスできるページが自動的に切り替わります。</p>
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {[
-                { role: '管理者', pages: '全ページ+管理' },
-                { role: 'マネージャー', pages: '全ページ(管理除く)' },
-                { role: '営業', pages: 'ダッシュボード,案件,経費,地図' },
-                { role: '事務', pages: 'ダッシュボード,案件,経費,管理(一部)' },
-                { role: 'スタッフ', pages: 'ダッシュボード,案件' },
-              ].map((r) => (
-                <div key={r.role} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-[11px]">
-                  <span className="font-medium text-gray-700">{r.role}</span>
-                  <span className="text-gray-400">: {r.pages}</span>
+        const toggleMaster = (role: string, page: string) => {
+          if (role === 'admin') return;
+          setRoleMaster((prev) => ({
+            ...prev,
+            [role]: { ...prev[role], [page]: !prev[role]?.[page] },
+          }));
+        };
+
+        const toggleUser = (userId: string, page: string) => {
+          setUserPerms((prev) => ({
+            ...prev,
+            [userId]: { ...prev[userId], [page]: !prev[userId]?.[page] },
+          }));
+        };
+
+        const applyMasterToAll = () => {
+          if (!confirm('全従業員にマスター設定を適用します。個別に変更した権限はリセットされます。よろしいですか？')) return;
+          const newPerms: Record<string, Record<string, boolean>> = {};
+          permEmployees.forEach((emp) => {
+            const tmpl = roleMaster[emp.role];
+            if (tmpl) newPerms[emp.id] = { ...tmpl };
+          });
+          setUserPerms(newPerms);
+          showToast('マスター設定を全従業員に適用しました');
+        };
+
+        const getUserPerm = (emp: EmployeeRow, page: string) => {
+          if (userPerms[emp.id] && userPerms[emp.id][page] !== undefined) return userPerms[emp.id][page];
+          if (roleMaster[emp.role]) return !!roleMaster[emp.role][page];
+          return false;
+        };
+
+        const handleSave = async () => {
+          setPermSaving(true);
+          const userPermList = permEmployees.map((emp) => ({
+            user_id: emp.id,
+            pages: Object.fromEntries(PAGE_KEYS.map((pk) => [pk, getUserPerm(emp, pk)])),
+          }));
+          const res = await api.savePagePermissions({ role_master: roleMaster, user_permissions: userPermList });
+          setPermSaving(false);
+          if (res.success) showToast('ページアクセス権限を保存しました');
+          else showToast('保存に失敗しました', 'error');
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* 役職別マスター設定 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-icons text-green-600 text-lg">tune</span>
+                  <h3 className="font-bold text-sm">役職別マスター設定</h3>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1" onClick={applyMasterToAll}>
+                    <span className="material-icons text-sm">sync</span>全従業員にマスター適用
+                  </button>
+                </div>
+              </div>
+              <p className="px-4 pt-2 pb-1 text-xs text-gray-400">役職ごとのデフォルト権限テンプレートです。新規従業員登録時にこのテンプレートが自動適用されます。</p>
 
-          {permLoading ? (
-            <div className="flex items-center justify-center py-8"><div className="spinner" /><p className="ml-3 text-gray-500 text-sm">読み込み中...</p></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left border-t border-gray-100">
-                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">従業員名</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">メール</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">現在の役職</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-xs">変更後</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permEmployees.map((emp) => {
-                    const currentRole = permChanges[emp.id] || emp.role;
-                    const isChanged = permChanges[emp.id] !== undefined;
+              {permLoading ? (
+                <div className="flex items-center justify-center py-8"><div className="spinner" /><p className="ml-3 text-gray-500 text-sm">読み込み中...</p></div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4">
+                  {ROLE_DEFS.map((rd) => {
+                    const perms = roleMaster[rd.key] || {};
                     return (
-                      <tr key={emp.id} className={`border-t border-gray-100 ${isChanged ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                        <td className="px-4 py-2 font-medium text-sm">{emp.name}</td>
-                        <td className="px-4 py-2 text-gray-500 text-xs">{emp.email || '-'}</td>
-                        <td className="px-4 py-2">
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
-                            {ROLE_LABELS[emp.role] || emp.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2">
-                          <select
-                            className="form-input text-xs py-1"
-                            value={currentRole}
-                            onChange={(e) => {
-                              const newRole = e.target.value;
-                              if (newRole === emp.role) {
-                                setPermChanges((prev) => { const n = { ...prev }; delete n[emp.id]; return n; });
-                              } else {
-                                setPermChanges((prev) => ({ ...prev, [emp.id]: newRole }));
-                              }
-                            }}
-                          >
-                            <option value="admin">管理者</option>
-                            <option value="manager">営業マネージャー</option>
-                            <option value="sales">営業</option>
-                            <option value="staff">スタッフ</option>
-                            <option value="office">事務</option>
-                          </select>
-                        </td>
-                      </tr>
+                      <div key={rd.key} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className={`flex items-center gap-2 px-3 py-2 text-sm font-bold ${rd.key === 'admin' ? 'bg-purple-50 text-purple-700' : 'bg-gray-50 text-gray-700'}`}>
+                          <span className="material-icons text-base">{rd.icon}</span>{rd.label}
+                        </div>
+                        <div className="p-2 space-y-0.5">
+                          {PAGE_KEYS.map((pk) => (
+                            <label key={pk} className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-50 ${rd.key === 'admin' ? 'opacity-50' : ''}`}>
+                              <input
+                                type="checkbox"
+                                className="rounded w-3.5 h-3.5 accent-green-600"
+                                checked={rd.key === 'admin' ? true : !!perms[pk]}
+                                disabled={rd.key === 'admin'}
+                                onChange={() => toggleMaster(rd.key, pk)}
+                              />
+                              <span className="text-gray-700">{PAGE_LABELS[pk]}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     );
                   })}
-                  {permEmployees.length === 0 && !permLoading && (
-                    <tr><td colSpan={4} className="text-center py-6 text-gray-400 text-sm">従業員データがありません</td></tr>
-                  )}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {/* 個別ユーザー権限 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-icons text-green-600 text-lg">people</span>
+                  <h3 className="font-bold text-sm">個別ユーザー権限</h3>
+                </div>
+                <button
+                  className="btn-primary text-xs py-1.5 px-4"
+                  disabled={permSaving}
+                  onClick={handleSave}
+                >
+                  <span className="material-icons text-sm">save</span>
+                  {permSaving ? '保存中...' : 'アクセス権限を保存'}
+                </button>
+              </div>
+              <p className="px-4 pt-2 pb-1 text-xs text-gray-400">各ユーザーのページアクセス権限を個別に管理します。チェックを入れるとそのページへのアクセスが許可されます。</p>
+
+              {permLoading ? (
+                <div className="flex items-center justify-center py-8"><div className="spinner" /><p className="ml-3 text-gray-500 text-sm">読み込み中...</p></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-t border-gray-100">
+                        <th className="text-left px-3 py-2 font-medium text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50">ユーザー</th>
+                        <th className="text-left px-2 py-2 font-medium text-gray-600 whitespace-nowrap">役職</th>
+                        {PAGE_KEYS.map((pk) => (
+                          <th key={pk} className="text-center px-1.5 py-2 font-medium text-gray-500 whitespace-nowrap">{PAGE_LABELS[pk]}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {permEmployees.map((emp) => (
+                        <tr key={emp.id} className="border-t border-gray-100 hover:bg-gray-50">
+                          <td className="px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap sticky left-0 bg-white">{emp.name}</td>
+                          <td className="px-2 py-1.5">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {ROLE_LABELS[emp.role] || emp.role}
+                            </span>
+                          </td>
+                          {PAGE_KEYS.map((pk) => (
+                            <td key={pk} className="text-center px-1.5 py-1.5">
+                              <input
+                                type="checkbox"
+                                className="rounded w-3.5 h-3.5 accent-green-600"
+                                checked={getUserPerm(emp, pk)}
+                                disabled={emp.role === 'admin'}
+                                onChange={() => toggleUser(emp.id, pk)}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      {permEmployees.length === 0 && (
+                        <tr><td colSpan={2 + PAGE_KEYS.length} className="text-center py-6 text-gray-400">従業員データがありません</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ==================== マスター管理タブ ==================== */}
       {activeTab === 'masters' && (

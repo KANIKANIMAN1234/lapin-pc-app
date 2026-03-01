@@ -183,6 +183,12 @@ export const api = {
 
   formatText: (inputText: string, formatType: string = 'meeting') =>
     requestPost<{ formatted_text: string }>('formatText', { input_text: inputText, format_type: formatType }),
+
+  getPagePermissions: () =>
+    requestGet<PagePermissionsData>('getPagePermissions'),
+
+  savePagePermissions: (data: { role_master?: Record<string, Record<string, boolean>>; user_permissions?: { user_id: string; pages: Record<string, boolean> }[] }) =>
+    requestPost<{ message: string }>('savePagePermissions', data),
 };
 
 export interface MeetingRecord {
@@ -207,6 +213,11 @@ export interface CostItem {
   description: string;
   amount: number;
   created_at: string;
+}
+
+export interface PagePermissionsData {
+  role_master: Record<string, Record<string, boolean>>;
+  user_permissions: { user_id: string; pages: Record<string, boolean> }[];
 }
 
 export interface MasterData {
