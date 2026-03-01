@@ -8,7 +8,8 @@ import type { MeetingRecord, CostItem, AccountPhoto } from '@/lib/api';
 import { STATUS_LABELS } from '@/lib/mockProjects';
 import type { Project, Photo, ProjectStatus } from '@/types';
 
-type SpeechRecognitionType = typeof window extends { SpeechRecognition: infer T } ? T : unknown;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpeechRecognitionInstance = any;
 
 const PHOTO_TYPES = [
   { id: 'before', label: '契約前' },
@@ -64,7 +65,9 @@ export default function ProjectDetailPage() {
   const [meetingTypes, setMeetingTypes] = useState<string[]>(DEFAULT_MEETING_TYPES);
   const [isRecording, setIsRecording] = useState(false);
   const [aiFormatting, setAiFormatting] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionType | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance>(null);
+  const baseContentRef = useRef('');
+  const intentionalStopRef = useRef(false);
 
   const [costModal, setCostModal] = useState(false);
   const [costForm, setCostForm] = useState({
@@ -193,47 +196,68 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const stopVoice = useCallback(() => {
+    intentionalStopRef.current = true;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setIsRecording(false);
+  }, []);
+
   const toggleVoiceInput = useCallback(() => {
     if (isRecording) {
-      const rec = recognitionRef.current as { stop?: () => void } | null;
-      rec?.stop?.();
-      setIsRecording(false);
+      stopVoice();
       return;
     }
     const W = window as unknown as Record<string, unknown>;
-    const SpeechRec = (W.SpeechRecognition || W.webkitSpeechRecognition) as { new(): {
-      lang: string; continuous: boolean; interimResults: boolean;
-      onresult: (e: { results: { isFinal: boolean;[n: number]: { transcript: string } }[] }) => void;
-      onerror: () => void; onend: () => void; start: () => void; stop: () => void;
-    } } | undefined;
+    const SpeechRec = W.SpeechRecognition || W.webkitSpeechRecognition;
     if (!SpeechRec) { alert('このブラウザは音声入力に対応していません'); return; }
-    const rec = new SpeechRec();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new (SpeechRec as any)();
     rec.lang = 'ja-JP';
     rec.continuous = true;
     rec.interimResults = true;
-    rec.onresult = (e) => {
+
+    baseContentRef.current = meetingForm.content;
+    intentionalStopRef.current = false;
+
+    rec.onresult = (e: { results: SpeechRecognitionResultList }) => {
       let transcript = '';
       for (let i = 0; i < e.results.length; i++) {
         transcript += e.results[i][0].transcript;
       }
-      setMeetingForm((prev) => ({ ...prev, content: prev.content.split('\n【音声入力中】')[0] + (transcript ? '\n【音声入力中】' + transcript : '') }));
-      const allFinal = Array.from(e.results).every((r) => r.isFinal);
-      if (allFinal && transcript) {
-        setMeetingForm((prev) => {
-          const base = prev.content.split('\n【音声入力中】')[0];
-          return { ...prev, content: (base ? base + '\n' : '') + transcript };
-        });
-      }
+      const base = baseContentRef.current;
+      setMeetingForm((prev) => ({
+        ...prev,
+        content: base + (base && transcript ? '\n' : '') + transcript,
+      }));
     };
-    rec.onerror = () => setIsRecording(false);
-    rec.onend = () => setIsRecording(false);
-    rec.start();
-    recognitionRef.current = rec as unknown as SpeechRecognitionType;
-    setIsRecording(true);
-  }, [isRecording]);
+
+    rec.onerror = (e: { error?: string }) => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      stopVoice();
+    };
+
+    rec.onend = () => {
+      if (!intentionalStopRef.current && recognitionRef.current) {
+        try { rec.start(); } catch { stopVoice(); }
+        return;
+      }
+      setIsRecording(false);
+    };
+
+    try {
+      rec.start();
+      recognitionRef.current = rec;
+      setIsRecording(true);
+    } catch {
+      alert('音声認識の開始に失敗しました');
+    }
+  }, [isRecording, meetingForm.content, stopVoice]);
 
   const handleAiFormat = useCallback(async () => {
-    const raw = meetingForm.content.split('\n【音声入力中】')[0].trim();
+    const raw = meetingForm.content.trim();
     if (!raw) return;
     setAiFormatting(true);
     const res = await api.formatText(raw, 'meeting');
