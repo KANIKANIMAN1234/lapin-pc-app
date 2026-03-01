@@ -152,60 +152,75 @@ export default function ExpensePage() {
       <h2 className="text-xl font-bold mb-6">経費登録</h2>
       <div className="expense-layout">
         <div className="expense-form-card">
-          <h3 className="font-bold mb-4 flex items-center gap-2"><span className="material-icons">add_circle</span>新規経費登録</h3>
+          <h3 className="font-bold mb-5 text-base">新規経費登録</h3>
           <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">レシート・領収書</label>
-              <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-green-500 hover:bg-green-50/50 transition-colors">
-                <span className="material-icons text-4xl text-gray-400">cloud_upload</span>
-                <p className="mt-2 text-gray-600 text-sm">レシート・領収書をアップロード</p>
+            {/* レシートアップロード＆プレビュー（横並び） */}
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-50/30 transition-colors min-h-[120px]"
+              >
+                <span className="material-icons text-3xl text-green-500 mb-1">cloud_upload</span>
+                <p className="text-sm font-medium text-green-600">レシート・領収書を</p>
+                <p className="text-sm font-medium text-green-600">アップロード</p>
+                <p className="text-xs text-gray-400 mt-1">クリックしてから添付</p>
+              </div>
+              <div className="border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center min-h-[120px] overflow-hidden">
+                {receiptPreview ? (
+                  <img src={receiptPreview} alt="レシート" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <>
+                    <span className="material-icons text-3xl text-gray-300 mb-1">image</span>
+                    <p className="text-xs text-gray-400 text-center px-2">アップロードした写真が<br />ここに表示されます</p>
+                  </>
+                )}
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
             </div>
-            {receiptPreview && (
-              <>
-                <div className="mb-4">
-                  <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-100 h-32 flex items-center justify-center">
-                    <img src={receiptPreview} alt="レシート" className="max-h-full max-w-full object-contain" />
-                  </div>
+
+            {ocrLoading && <div className="mb-4 p-3 bg-gray-50 rounded-lg text-center text-sm text-gray-500">OCR読み取り中...</div>}
+            {ocrResult && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-xs font-medium text-gray-600 mb-2">OCR結果（参考）</p>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <p>金額: ¥{ocrResult.amount?.toLocaleString()}</p>
+                  <p>日付: {ocrResult.date}</p>
+                  <p>店舗: {ocrResult.store_name}</p>
+                  <p>品目: {ocrResult.items}</p>
                 </div>
-                {ocrLoading && <div className="mb-4 p-3 bg-gray-50 rounded-lg text-center text-sm text-gray-500">OCR読み取り中...</div>}
-                {ocrResult && (
-                  <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs font-medium text-gray-600 mb-2">OCR結果（参考）</p>
-                    <div className="text-sm text-gray-700 space-y-1">
-                      <p>金額: ¥{ocrResult.amount?.toLocaleString()}</p>
-                      <p>日付: {ocrResult.date}</p>
-                      <p>店舗: {ocrResult.store_name}</p>
-                      <p>品目: {ocrResult.items}</p>
-                    </div>
-                  </div>
-                )}
-              </>
+              </div>
             )}
+
             <div className="space-y-4">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">案件</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">顧客番号 / 案件</label>
                 <select value={project} onChange={(e) => setProject(e.target.value)} className="form-input">
-                  <option value="">共通経費（案件なし）</option>
+                  <option value="">案件を選択</option>
                   {projectOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">金額 (円)</label>
-                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="form-input" placeholder="例: 12500" required />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">金額</label>
+                  <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="form-input" placeholder="0" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="form-input" required />
+                </div>
               </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">日付</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="form-input" required />
-              </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className="form-input">
                   {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
-                <input type="text" value={memo} onChange={(e) => setMemo(e.target.value)} className="form-input" placeholder="例: 塗料・ローラー購入" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <input type="text" value={memo} onChange={(e) => setMemo(e.target.value)} className="form-input" placeholder="品目や用途を入力" />
               </div>
             </div>
-            <button type="submit" className="btn-primary mt-6 w-full" disabled={submitting}>
+            <button type="submit" className="mt-6 w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
               <span className="material-icons">cloud_upload</span>{submitting ? '登録中...' : 'スプレッドシートに登録'}
             </button>
           </form>
