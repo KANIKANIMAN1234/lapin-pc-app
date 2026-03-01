@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, isApiConfigured } from '@/lib/api';
-import type { MeetingRecord, CostItem } from '@/lib/api';
+import type { MeetingRecord, CostItem, AccountPhoto } from '@/lib/api';
 import { STATUS_LABELS } from '@/lib/mockProjects';
 import type { Project, Photo, ProjectStatus } from '@/types';
 
@@ -76,6 +76,13 @@ export default function ProjectDetailPage() {
   });
   const [costSaving, setCostSaving] = useState(false);
 
+  const [customerPhoto, setCustomerPhoto] = useState<string | null>(null);
+  const [custPhotoModal, setCustPhotoModal] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<AccountPhoto[]>([]);
+  const [custPhotoUploading, setCustPhotoUploading] = useState(false);
+  const [custPhotoNewPreview, setCustPhotoNewPreview] = useState<string | null>(null);
+  const custPhotoFileRef = useRef<HTMLInputElement>(null);
+
   const loadMeetings = useCallback(async () => {
     if (!id) return;
     const res = await api.getMeetings(id);
@@ -97,11 +104,15 @@ export default function ProjectDetailPage() {
       api.getProject(id),
       api.getPhotos(id),
       api.getMasters(),
-    ]).then(([projRes, photoRes, mastersRes]) => {
+      api.getAccountPhotos(),
+    ]).then(([projRes, photoRes, mastersRes, galleryRes]) => {
       if (projRes.success && projRes.data) {
         const p = (projRes.data as unknown as { project: Project }).project ?? projRes.data as unknown as Project;
         setProject(p);
         setStatus(p.status);
+        const cp = (projRes.data as unknown as Record<string, string>).customer_photo
+          || (p as unknown as Record<string, string>).customer_photo;
+        if (cp) setCustomerPhoto(cp);
       }
       if (photoRes.success && photoRes.data?.photos) setPhotos(photoRes.data.photos);
       if (mastersRes.success && mastersRes.data) {
@@ -110,11 +121,42 @@ export default function ProjectDetailPage() {
           setMeetingTypes(d.meeting_type.map((item) => item.value));
         }
       }
+      if (galleryRes.success && galleryRes.data) {
+        setGalleryPhotos(galleryRes.data.photos || []);
+      }
       setLoading(false);
     });
     loadMeetings();
     loadCostItems();
   }, [id, loadMeetings, loadCostItems]);
+
+  const selectCustPhoto = async (url: string) => {
+    setCustPhotoUploading(true);
+    const res = await api.saveCustomerPhoto(id, { photo_url: url });
+    if (res.success && res.data) setCustomerPhoto(res.data.photo_url);
+    setCustPhotoUploading(false);
+    setCustPhotoModal(false);
+    setCustPhotoNewPreview(null);
+  };
+
+  const handleCustPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => setCustPhotoNewPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const uploadAndSelectCustPhoto = async () => {
+    if (!custPhotoNewPreview) return;
+    setCustPhotoUploading(true);
+    const res = await api.saveCustomerPhoto(id, { photo_data: custPhotoNewPreview });
+    if (res.success && res.data) setCustomerPhoto(res.data.photo_url);
+    setCustPhotoUploading(false);
+    setCustPhotoModal(false);
+    setCustPhotoNewPreview(null);
+  };
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     setStatus(newStatus);
@@ -302,29 +344,51 @@ export default function ProjectDetailPage() {
             {/* 顧客情報 */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-base font-bold mb-4 pb-2 border-b border-gray-100">顧客情報</h3>
-              <div className="space-y-4">
-                <DetailRow label="管理番号" value={project.project_number} />
-                <DetailRow label="顧客名">
-                  {editing ? (
-                    <input className="form-input w-full" value={editForm.customer_name || ''} onChange={(e) => setEditForm({ ...editForm, customer_name: e.target.value })} />
-                  ) : project.customer_name}
-                </DetailRow>
-                <DetailRow label="住所">
-                  {editing ? (
-                    <input className="form-input w-full" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+              <div className="flex gap-5">
+                <div className="flex-1 space-y-4">
+                  <DetailRow label="管理番号" value={project.project_number} />
+                  <DetailRow label="顧客名">
+                    {editing ? (
+                      <input className="form-input w-full" value={editForm.customer_name || ''} onChange={(e) => setEditForm({ ...editForm, customer_name: e.target.value })} />
+                    ) : project.customer_name}
+                  </DetailRow>
+                  <DetailRow label="住所">
+                    {editing ? (
+                      <input className="form-input w-full" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                    ) : (
+                      <span>{project.address}{' '}
+                        <Link href={`/map?focus=${project.id}`} className="text-blue-600 hover:underline text-sm inline-flex items-center gap-0.5">
+                          <span className="material-icons" style={{ fontSize: 14 }}>map</span>地図
+                        </Link>
+                      </span>
+                    )}
+                  </DetailRow>
+                  <DetailRow label="電話番号">
+                    {editing ? (
+                      <input className="form-input w-full" value={editForm.phone || ''} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                    ) : project.phone ? <a href={`tel:${project.phone}`} className="text-green-600 hover:underline">{project.phone}</a> : '-'}
+                  </DetailRow>
+                </div>
+                <div
+                  className="flex-shrink-0 w-36 h-36 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center cursor-pointer overflow-hidden group hover:border-green-400 hover:bg-green-50/30 transition-colors relative"
+                  onClick={() => setCustPhotoModal(true)}
+                >
+                  {custPhotoUploading ? (
+                    <div className="spinner" style={{ width: 28, height: 28, borderWidth: 2 }} />
+                  ) : customerPhoto ? (
+                    <>
+                      <img src={customerPhoto} alt="顧客写真" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="material-icons text-white" style={{ fontSize: 24 }}>edit</span>
+                      </div>
+                    </>
                   ) : (
-                    <span>{project.address}{' '}
-                      <Link href={`/map?focus=${project.id}`} className="text-blue-600 hover:underline text-sm inline-flex items-center gap-0.5">
-                        <span className="material-icons" style={{ fontSize: 14 }}>map</span>地図
-                      </Link>
-                    </span>
+                    <div className="flex flex-col items-center text-gray-300 group-hover:text-green-400 transition-colors">
+                      <span className="material-icons" style={{ fontSize: 32 }}>add_photo_alternate</span>
+                      <span className="text-[10px] mt-1">顧客写真</span>
+                    </div>
                   )}
-                </DetailRow>
-                <DetailRow label="電話番号">
-                  {editing ? (
-                    <input className="form-input w-full" value={editForm.phone || ''} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
-                  ) : project.phone ? <a href={`tel:${project.phone}`} className="text-green-600 hover:underline">{project.phone}</a> : '-'}
-                </DetailRow>
+                </div>
               </div>
             </div>
 
@@ -709,6 +773,72 @@ export default function ProjectDetailPage() {
               <button onClick={() => setCostModal(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">キャンセル</button>
               <button onClick={handleCreateCost} disabled={costSaving || !costForm.amount} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
                 {costSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 顧客写真選択モーダル */}
+      {custPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setCustPhotoModal(false); setCustPhotoNewPreview(null); }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="font-bold text-base">顧客写真を選択</h3>
+              <button onClick={() => { setCustPhotoModal(false); setCustPhotoNewPreview(null); }} className="text-gray-400 hover:text-gray-600">
+                <span className="material-icons">close</span>
+              </button>
+            </div>
+            <div className="p-5 space-y-5 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-gray-500">使用する写真を選択してください</p>
+
+              {galleryPhotos.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-gray-600 mb-2">登録済み写真 ({galleryPhotos.length}枚)</h4>
+                  <div className="grid grid-cols-5 gap-2">
+                    {galleryPhotos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-green-400 transition-colors"
+                        onClick={() => selectCustPhoto(photo.url)}
+                      >
+                        <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h4 className="text-xs font-bold text-gray-600 mb-2">新しくアップロード</h4>
+                <div
+                  className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-300 hover:bg-green-50/30 transition-colors"
+                  onClick={() => custPhotoFileRef.current?.click()}
+                >
+                  <span className="material-icons text-gray-300" style={{ fontSize: 28 }}>add_photo_alternate</span>
+                  <span className="text-xs text-gray-400 mt-1">写真を選択</span>
+                </div>
+                <input ref={custPhotoFileRef} type="file" accept="image/*" className="hidden" onChange={handleCustPhotoUpload} />
+                {custPhotoNewPreview && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-green-400">
+                      <img src={custPhotoNewPreview} alt="アップロード" className="w-full h-full object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      onClick={uploadAndSelectCustPhoto}
+                      disabled={custPhotoUploading}
+                    >
+                      {custPhotoUploading ? 'アップロード中...' : 'この写真を使用'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => { setCustPhotoModal(false); setCustPhotoNewPreview(null); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                キャンセル
               </button>
             </div>
           </div>

@@ -198,6 +198,9 @@ export const api = {
 
   deleteAccountPhoto: (photoId: string) =>
     requestPost<{ photos: AccountPhoto[]; count: number; max: number }>('deleteAccountPhoto', { photo_id: photoId }),
+
+  saveCustomerPhoto: (projectId: string, data: { photo_url?: string; photo_data?: string }) =>
+    requestPost<{ photo_url: string }>('saveCustomerPhoto', { project_id: projectId, ...data }),
 };
 
 export interface MeetingRecord {
