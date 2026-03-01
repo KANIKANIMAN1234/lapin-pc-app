@@ -202,6 +202,9 @@ export const api = {
   saveCustomerPhoto: (projectId: string, data: { photo_url?: string; photo_data?: string }) =>
     requestPost<{ photo_url: string }>('saveCustomerPhoto', { project_id: projectId, ...data }),
 
+  getReports: (params?: Record<string, string>) =>
+    requestGet<{ reports: DailyReport[]; total: number }>('getReports', params),
+
   getNotices: (params?: { limit?: number; offset?: number }) =>
     requestGet<{ notices: Notice[] }>('getNotices', params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : {}),
 
@@ -256,6 +259,22 @@ export interface AccountPhoto {
   id: string;
   url: string;
   name: string;
+  created_at: string;
+}
+
+export interface DailyReport {
+  id: number;
+  user_id: string;
+  user_name: string;
+  report_date: string;
+  title: string;
+  content: string;
+  visits: unknown[];
+  activities: unknown[];
+  achievements: unknown[];
+  issues: unknown[];
+  next_actions: unknown[];
+  submitted_at: string;
   created_at: string;
 }
 

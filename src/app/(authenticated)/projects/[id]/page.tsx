@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, isApiConfigured } from '@/lib/api';
-import type { MeetingRecord, CostItem, AccountPhoto } from '@/lib/api';
+import type { MeetingRecord, CostItem, AccountPhoto, DailyReport } from '@/lib/api';
 import { STATUS_LABELS } from '@/lib/mockProjects';
 import type { Project, Photo, ProjectStatus } from '@/types';
 
@@ -47,7 +47,7 @@ export default function ProjectDetailPage() {
   const [costItems, setCostItems] = useState<CostItem[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'basic' | 'photo' | 'cost' | 'meeting'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'photo' | 'cost' | 'meeting' | 'report'>('basic');
   const [photoType, setPhotoType] = useState('before');
   const [status, setStatus] = useState<ProjectStatus>('inquiry');
   const [editing, setEditing] = useState(false);
@@ -70,6 +70,9 @@ export default function ProjectDetailPage() {
   const accumulatedRef = useRef('');
   const intentionalStopRef = useRef(false);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [reports, setReports] = useState<DailyReport[]>([]);
+  const [reportDetail, setReportDetail] = useState<DailyReport | null>(null);
 
   const [costModal, setCostModal] = useState(false);
   const [costForm, setCostForm] = useState({
@@ -133,6 +136,9 @@ export default function ProjectDetailPage() {
     });
     loadMeetings();
     loadCostItems();
+    api.getReports({ limit: '200' }).then((res) => {
+      if (res.success && res.data?.reports) setReports(res.data.reports);
+    });
   }, [id, loadMeetings, loadCostItems]);
 
   const selectCustPhoto = async (url: string) => {
@@ -345,6 +351,7 @@ export default function ProjectDetailPage() {
     { id: 'photo' as const, label: `写真 (${photos.length})` },
     { id: 'cost' as const, label: '原価' },
     { id: 'meeting' as const, label: '商談記録' },
+    { id: 'report' as const, label: `日報 (${reports.length})` },
   ];
 
   return (
@@ -820,6 +827,119 @@ export default function ProjectDetailPage() {
               <button onClick={() => setCostModal(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">キャンセル</button>
               <button onClick={handleCreateCost} disabled={costSaving || !costForm.amount} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
                 {costSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 日報 ==================== */}
+      {activeTab === 'report' && (
+        <div>
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="p-5 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">日報一覧</h3>
+              <p className="text-xs text-gray-500 mt-0.5">スマホから登録された日報が表示されます</p>
+            </div>
+            {reports.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">
+                <span className="material-icons text-4xl mb-2 block">description</span>
+                <p className="text-sm">日報がありません</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {reports.map((r) => (
+                  <div
+                    key={r.id}
+                    className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex items-start gap-4"
+                    onClick={() => setReportDetail(r)}
+                  >
+                    <div className="flex-shrink-0 w-16 h-16 bg-green-50 rounded-lg flex flex-col items-center justify-center">
+                      <span className="text-xs text-green-600 font-medium">{formatDateShort(r.report_date).substring(5, 7)}月</span>
+                      <span className="text-lg font-bold text-green-700">{formatDateShort(r.report_date).substring(8, 10)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">{r.title || `${formatDateShort(r.report_date)} 日報`}</h4>
+                        {r.user_name && (
+                          <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">{r.user_name}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 whitespace-pre-wrap">{r.content}</p>
+                    </div>
+                    <span className="material-icons text-gray-300 text-xl flex-shrink-0 mt-2">chevron_right</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 日報詳細モーダル */}
+      {reportDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setReportDetail(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h3 className="font-bold text-base text-gray-900">{reportDetail.title || `${formatDateShort(reportDetail.report_date)} 日報`}</h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs text-gray-500">
+                    <span className="material-icons text-xs align-middle mr-0.5">calendar_today</span>
+                    {formatDateShort(reportDetail.report_date)}
+                  </span>
+                  {reportDetail.user_name && (
+                    <span className="text-xs text-gray-500">
+                      <span className="material-icons text-xs align-middle mr-0.5">person</span>
+                      {reportDetail.user_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setReportDetail(null)} className="text-gray-400 hover:text-gray-600">
+                <span className="material-icons">close</span>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1">
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">報告内容</h4>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{reportDetail.content || '（内容なし）'}</p>
+              </div>
+
+              {reportDetail.achievements && Array.isArray(reportDetail.achievements) && reportDetail.achievements.length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-xs font-bold text-gray-500 mb-1">成果</h4>
+                  <ul className="text-sm text-gray-700 list-disc list-inside space-y-0.5">
+                    {reportDetail.achievements.map((a, i) => <li key={i}>{String(a)}</li>)}
+                  </ul>
+                </div>
+              )}
+              {reportDetail.issues && Array.isArray(reportDetail.issues) && reportDetail.issues.length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-xs font-bold text-gray-500 mb-1">課題</h4>
+                  <ul className="text-sm text-gray-700 list-disc list-inside space-y-0.5">
+                    {reportDetail.issues.map((a, i) => <li key={i}>{String(a)}</li>)}
+                  </ul>
+                </div>
+              )}
+              {reportDetail.next_actions && Array.isArray(reportDetail.next_actions) && reportDetail.next_actions.length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-xs font-bold text-gray-500 mb-1">次のアクション</h4>
+                  <ul className="text-sm text-gray-700 list-disc list-inside space-y-0.5">
+                    {reportDetail.next_actions.map((a, i) => <li key={i}>{String(a)}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {reportDetail.submitted_at && (
+                <p className="text-xs text-gray-400 mt-4 text-right">
+                  提出: {new Date(reportDetail.submitted_at).toLocaleString('ja-JP')}
+                </p>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-end flex-shrink-0">
+              <button onClick={() => setReportDetail(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                閉じる
               </button>
             </div>
           </div>
