@@ -9,7 +9,7 @@ import { STATUS_LABELS } from '@/lib/mockProjects';
 import type { Project, Photo, ProjectStatus } from '@/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SpeechRecognitionInstance = any;
+type SpeechRecInstance = any;
 
 const PHOTO_TYPES = [
   { id: 'before', label: '契約前' },
@@ -65,9 +65,11 @@ export default function ProjectDetailPage() {
   const [meetingTypes, setMeetingTypes] = useState<string[]>(DEFAULT_MEETING_TYPES);
   const [isRecording, setIsRecording] = useState(false);
   const [aiFormatting, setAiFormatting] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionInstance>(null);
+  const recognitionRef = useRef<SpeechRecInstance>(null);
   const baseContentRef = useRef('');
+  const accumulatedRef = useRef('');
   const intentionalStopRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [costModal, setCostModal] = useState(false);
   const [costForm, setCostForm] = useState({
@@ -196,37 +198,33 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const stopVoice = useCallback(() => {
-    intentionalStopRef.current = true;
+  const cleanupVoice = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
-    setIsRecording(false);
   }, []);
 
-  const toggleVoiceInput = useCallback(() => {
-    if (isRecording) {
-      stopVoice();
-      return;
-    }
+  const launchRecPC = useCallback(() => {
     const W = window as unknown as Record<string, unknown>;
     const SpeechRec = W.SpeechRecognition || W.webkitSpeechRecognition;
-    if (!SpeechRec) { alert('このブラウザは音声入力に対応していません'); return; }
+    if (!SpeechRec) return false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = new (SpeechRec as any)();
     rec.lang = 'ja-JP';
-    rec.continuous = true;
+    rec.continuous = false;
     rec.interimResults = true;
-
-    baseContentRef.current = meetingForm.content;
-    intentionalStopRef.current = false;
 
     rec.onresult = (e: { results: SpeechRecognitionResultList }) => {
       let transcript = '';
       for (let i = 0; i < e.results.length; i++) {
         transcript += e.results[i][0].transcript;
       }
+      accumulatedRef.current = transcript;
       const base = baseContentRef.current;
       setMeetingForm((prev) => ({
         ...prev,
@@ -236,25 +234,50 @@ export default function ProjectDetailPage() {
 
     rec.onerror = (e: { error?: string }) => {
       if (e.error === 'no-speech' || e.error === 'aborted') return;
-      stopVoice();
+      intentionalStopRef.current = true;
+      cleanupVoice();
+      setIsRecording(false);
     };
 
     rec.onend = () => {
-      if (!intentionalStopRef.current && recognitionRef.current) {
-        try { rec.start(); } catch { stopVoice(); }
+      if (intentionalStopRef.current) {
+        setIsRecording(false);
         return;
       }
-      setIsRecording(false);
+      const acc = accumulatedRef.current;
+      if (acc) {
+        baseContentRef.current += (baseContentRef.current ? '\n' : '') + acc;
+      }
+      accumulatedRef.current = '';
+      restartTimerRef.current = setTimeout(() => {
+        if (intentionalStopRef.current) return;
+        launchRecPC();
+      }, 300);
     };
 
     try {
       rec.start();
       recognitionRef.current = rec;
-      setIsRecording(true);
+      return true;
     } catch {
-      alert('音声認識の開始に失敗しました');
+      return false;
     }
-  }, [isRecording, meetingForm.content, stopVoice]);
+  }, [cleanupVoice]);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (isRecording) {
+      intentionalStopRef.current = true;
+      cleanupVoice();
+      setIsRecording(false);
+      return;
+    }
+    baseContentRef.current = meetingForm.content;
+    accumulatedRef.current = '';
+    intentionalStopRef.current = false;
+    const ok = launchRecPC();
+    if (!ok) { alert('このブラウザは音声入力に対応していません'); return; }
+    setIsRecording(true);
+  }, [isRecording, meetingForm.content, cleanupVoice, launchRecPC]);
 
   const handleAiFormat = useCallback(async () => {
     const raw = meetingForm.content.trim();
@@ -720,7 +743,7 @@ export default function ProjectDetailPage() {
                     <button
                       type="button"
                       onClick={handleAiFormat}
-                      disabled={aiFormatting || !meetingForm.content.split('\n【音声入力中】')[0].trim()}
+                      disabled={aiFormatting || !meetingForm.content.trim()}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       <span className="material-icons text-sm">auto_fix_high</span>
