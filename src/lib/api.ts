@@ -201,6 +201,12 @@ export const api = {
 
   saveCustomerPhoto: (projectId: string, data: { photo_url?: string; photo_data?: string }) =>
     requestPost<{ photo_url: string }>('saveCustomerPhoto', { project_id: projectId, ...data }),
+
+  getNotices: (params?: { limit?: number; offset?: number }) =>
+    requestGet<{ notices: Notice[] }>('getNotices', params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : {}),
+
+  createNotice: (data: { title?: string; body: string; category?: string; is_pinned?: boolean }) =>
+    requestPost<Notice>('createNotice', data),
 };
 
 export interface MeetingRecord {
@@ -250,5 +256,17 @@ export interface AccountPhoto {
   id: string;
   url: string;
   name: string;
+  created_at: string;
+}
+
+export interface Notice {
+  id: number;
+  user_id: string;
+  user_name: string;
+  user_role: string;
+  title: string;
+  body: string;
+  category: string;
+  is_pinned: boolean;
   created_at: string;
 }

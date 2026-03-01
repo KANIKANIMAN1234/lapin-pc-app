@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { api, isApiConfigured } from '@/lib/api';
+import type { Notice } from '@/lib/api';
 import type { DashboardData } from '@/types';
 import { Bar, Line } from 'react-chartjs-2';
 import {
@@ -28,9 +29,48 @@ function formatYen(v: number) {
 }
 
 type SalesPeriodMode = 'month' | 'quarter' | 'year';
+type DashboardTab = 'management' | 'calendar' | 'notices';
+
+const TABS: { key: DashboardTab; label: string; icon: string }[] = [
+  { key: 'management', label: '管理業務', icon: 'dashboard' },
+  { key: 'calendar', label: 'カレンダー', icon: 'calendar_today' },
+  { key: 'notices', label: '連絡事項', icon: 'campaign' },
+];
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<DashboardTab>('management');
+
+  return (
+    <div>
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-6">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.key
+                ? 'border-green-600 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            <span className="material-icons" style={{ fontSize: 18 }}>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'management' && <ManagementTab user={user} />}
+      {activeTab === 'calendar' && <CalendarTab />}
+      {activeTab === 'notices' && <NoticesTab user={user} />}
+    </div>
+  );
+}
+
+// ============================================================
+// ① 管理業務タブ（既存ダッシュボード）
+// ============================================================
+function ManagementTab({ user }: { user: { name?: string } | null }) {
   const [period, setPeriod] = useState('今月');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +109,6 @@ export default function DashboardPage() {
         return;
       }
       if (attempt < maxRetries - 1) {
-        console.log(`[Dashboard] リトライ ${attempt + 2}/${maxRetries}...`);
         await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
       }
     }
@@ -77,6 +116,8 @@ export default function DashboardPage() {
   }, [period]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  void setPeriod;
 
   if (loading) {
     return (
@@ -111,7 +152,6 @@ export default function DashboardPage() {
     { title: '粗利率', value: String(kpi.gross_profit_rate), unit: '%', change: undefined },
   ];
 
-  // --- Monthly sales chart data ---
   const monthlySales = data.charts?.monthly_sales ?? [];
   const getSalesChartData = () => {
     if (salesMode === 'year') {
@@ -124,9 +164,7 @@ export default function DashboardPage() {
     if (salesMode === 'quarter') {
       const qLabels = ['Q1 (4-6月)', 'Q2 (7-9月)', 'Q3 (10-12月)', 'Q4 (1-3月)'];
       const qData = [0, 0, 0, 0];
-      monthlySales.forEach((m, i) => {
-        qData[Math.floor(i / 3)] += m.amount || 0;
-      });
+      monthlySales.forEach((m, i) => { qData[Math.floor(i / 3)] += m.amount || 0; });
       return { type: 'bar' as const, labels: qLabels, data: qData };
     }
     return {
@@ -179,7 +217,6 @@ export default function DashboardPage() {
     },
   };
 
-  // --- Acquisition route 100% stacked horizontal bar ---
   const routeChart = data.charts?.acquisition_route ?? [];
   const routeTotal = routeChart.reduce((s, r) => s + r.count, 0);
   const routeStackedData = {
@@ -220,7 +257,6 @@ export default function DashboardPage() {
     },
   };
 
-  // --- Work type vertical bar chart ---
   const workChart = data.charts?.work_type ?? [];
   const workBarData = {
     labels: workChart.map((w) => w.type),
@@ -333,7 +369,6 @@ export default function DashboardPage() {
       )}
 
       <div className="charts-grid">
-        {/* 月別売上推移（全幅） */}
         <div className="chart-card chart-card-wide">
           <div className="chart-header">
             <h3 className="font-bold">月別売上推移</h3>
@@ -358,7 +393,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 集客ルート別案件数（100%積み上げ横棒） */}
         {routeChart.length > 0 && (
           <div className="chart-card">
             <h3 className="font-bold mb-4">集客ルート別案件数</h3>
@@ -368,7 +402,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* 工事種別別売上（縦棒グラフ） */}
         {workChart.length > 0 && (
           <div className="chart-card">
             <h3 className="font-bold mb-4">工事種別別売上</h3>
@@ -378,6 +411,308 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ② カレンダータブ
+// ============================================================
+function CalendarTab() {
+  const [calendarId, setCalendarId] = useState('');
+  const [inputId, setInputId] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('google_calendar_id');
+    if (saved) setCalendarId(saved);
+  }, []);
+
+  const saveCalendarId = () => {
+    const id = inputId.trim();
+    if (id) {
+      localStorage.setItem('google_calendar_id', id);
+      setCalendarId(id);
+      setShowSettings(false);
+    }
+  };
+
+  const encodedId = encodeURIComponent(calendarId);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <span className="material-icons text-green-600">calendar_today</span>
+          Googleカレンダー
+        </h2>
+        <button
+          onClick={() => { setShowSettings(!showSettings); setInputId(calendarId); }}
+          className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1"
+        >
+          <span className="material-icons" style={{ fontSize: 14 }}>settings</span>
+          カレンダー設定
+        </button>
+      </div>
+
+      {showSettings && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <p className="text-sm text-blue-800 mb-2 font-medium">GoogleカレンダーIDを設定</p>
+          <p className="text-xs text-blue-600 mb-3">
+            Googleカレンダーの「設定と共有」→「カレンダーの統合」からカレンダーIDをコピーしてください。
+            <br />通常は <code className="bg-blue-100 px-1 rounded">xxxxx@group.calendar.google.com</code> の形式です。
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputId}
+              onChange={(e) => setInputId(e.target.value)}
+              placeholder="カレンダーID（例: abc123@group.calendar.google.com）"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            <button onClick={saveCalendarId} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+              保存
+            </button>
+            <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
+      {calendarId ? (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
+          <iframe
+            src={`https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Asia%2FTokyo&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=0`}
+            style={{ border: 0, width: '100%', height: '100%' }}
+            title="Google Calendar"
+          />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+          <span className="material-icons text-gray-200" style={{ fontSize: 64 }}>calendar_today</span>
+          <p className="text-gray-400 mt-4">GoogleカレンダーIDが設定されていません</p>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="mt-4 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 inline-flex items-center gap-1"
+          >
+            <span className="material-icons" style={{ fontSize: 16 }}>settings</span>
+            カレンダーIDを設定
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// ③ 連絡事項タブ
+// ============================================================
+
+const NOTICE_CATEGORIES = [
+  { value: 'general', label: '連絡事項', color: 'bg-blue-50 text-blue-700' },
+  { value: 'notice', label: 'お知らせ', color: 'bg-green-50 text-green-700' },
+  { value: 'tip', label: '今日のお気づき', color: 'bg-yellow-50 text-yellow-700' },
+];
+
+function NoticesTab({ user }: { user: { id?: string; name?: string; role?: string } | null }) {
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formBody, setFormBody] = useState('');
+  const [formCategory, setFormCategory] = useState('general');
+  const [formPinned, setFormPinned] = useState(false);
+  const [posting, setPosting] = useState(false);
+
+  const fetchNotices = useCallback(async () => {
+    if (!isApiConfigured()) { setLoading(false); return; }
+    const res = await api.getNotices({ limit: 50 });
+    if (res.success && res.data?.notices) {
+      setNotices(res.data.notices);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchNotices(); }, [fetchNotices]);
+
+  const handlePost = async () => {
+    if (!formBody.trim()) return;
+    setPosting(true);
+    const res = await api.createNotice({
+      title: formTitle.trim(),
+      body: formBody.trim(),
+      category: formCategory,
+      is_pinned: formPinned,
+    });
+    if (res.success && res.data) {
+      setNotices((prev) => [res.data as Notice, ...prev]);
+      setFormTitle('');
+      setFormBody('');
+      setFormCategory('general');
+      setFormPinned(false);
+      setShowForm(false);
+    }
+    setPosting(false);
+  };
+
+  const getCategoryBadge = (cat: string) => {
+    const c = NOTICE_CATEGORIES.find((nc) => nc.value === cat);
+    if (!c) return null;
+    return <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${c.color}`}>{c.label}</span>;
+  };
+
+  const formatDate = (d: string) => {
+    try {
+      const dt = new Date(d);
+      const now = new Date();
+      const diff = now.getTime() - dt.getTime();
+      if (diff < 60000) return 'たった今';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}分前`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}時間前`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}日前`;
+      return dt.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch { return d; }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="spinner" /><p className="ml-3 text-gray-500">読み込み中...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <span className="material-icons text-green-600">campaign</span>
+          連絡事項
+        </h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 inline-flex items-center gap-1"
+        >
+          <span className="material-icons" style={{ fontSize: 16 }}>edit</span>
+          投稿する
+        </button>
+      </div>
+
+      <p className="text-xs text-gray-400 mb-4">
+        投稿するとLINE友達登録済みの全メンバーに通知が送信されます
+      </p>
+
+      {showForm && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <span className="material-icons text-green-600" style={{ fontSize: 16 }}>person</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium">{user?.name || 'ユーザー'}</p>
+              <p className="text-[10px] text-gray-400">{user?.role === 'admin' ? '管理者' : '従業員'}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <select
+                value={formCategory}
+                onChange={(e) => setFormCategory(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+              >
+                {NOTICE_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="件名（任意）"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+            </div>
+            <textarea
+              value={formBody}
+              onChange={(e) => setFormBody(e.target.value)}
+              placeholder="連絡内容を入力してください..."
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                <input type="checkbox" checked={formPinned} onChange={(e) => setFormPinned(e.target.checked)} className="rounded" />
+                ピン留め（上部に固定）
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handlePost}
+                  disabled={!formBody.trim() || posting}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  {posting ? (
+                    <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> 送信中...</>
+                  ) : (
+                    <><span className="material-icons" style={{ fontSize: 14 }}>send</span> 投稿＆通知</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notices.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <span className="material-icons text-gray-200" style={{ fontSize: 48 }}>forum</span>
+          <p className="text-gray-400 mt-3">まだ連絡事項はありません</p>
+          <p className="text-xs text-gray-300 mt-1">「投稿する」ボタンから最初の投稿をしましょう</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notices.map((notice) => (
+            <div
+              key={notice.id}
+              className={`bg-white rounded-xl border p-5 ${notice.is_pinned ? 'border-yellow-300 bg-yellow-50/30' : 'border-gray-200'}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  notice.user_role === 'admin' ? 'bg-red-100' : 'bg-green-100'
+                }`}>
+                  <span className={`material-icons ${notice.user_role === 'admin' ? 'text-red-600' : 'text-green-600'}`} style={{ fontSize: 18 }}>
+                    {notice.user_role === 'admin' ? 'admin_panel_settings' : 'person'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-sm font-medium">{notice.user_name}</span>
+                    {notice.user_role === 'admin' && (
+                      <span className="px-1.5 py-0.5 bg-red-50 text-red-600 text-[10px] font-medium rounded">管理者</span>
+                    )}
+                    {getCategoryBadge(notice.category)}
+                    {notice.is_pinned && (
+                      <span className="material-icons text-yellow-500" style={{ fontSize: 14 }}>push_pin</span>
+                    )}
+                    <span className="text-[11px] text-gray-400 ml-auto flex-shrink-0">{formatDate(notice.created_at)}</span>
+                  </div>
+                  {notice.title && (
+                    <h4 className="text-sm font-bold mb-1">{notice.title}</h4>
+                  )}
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{notice.body}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
